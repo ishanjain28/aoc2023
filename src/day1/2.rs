@@ -1,118 +1,72 @@
-use std::collections::VecDeque;
+#![feature(test)]
+extern crate test;
 
 const INPUTS: [&str; 2] = [include_str!("./sample.txt"), include_str!("./input.txt")];
 
-fn main() {
-    for input in INPUTS.iter() {
-        let mut total: u64 = 0;
+fn process(data: &str) -> u64 {
+    let mut total: u64 = 0;
 
-        for line in input.split('\n') {
-            let line: Vec<char> = line.chars().collect();
+    for line in data.split('\n') {
+        let mut first = 0;
+        let mut last = 0;
 
-            let mut first = None;
-            let mut last = 0;
+        let mut window = Vec::with_capacity(line.len());
+        let mut j = 0;
 
-            let mut tmp: VecDeque<char> = VecDeque::new();
+        for (i, c) in line.chars().enumerate() {
+            if (window.len() - j) >= 5 {
+                j += 1;
+            }
 
-            for c in line.iter() {
-                if tmp.len() >= 5 {
-                    tmp.pop_front();
+            match c {
+                v @ '1'..='9' if first == 0 => {
+                    let num = v as u8 - b'0';
+                    first = 10 * num;
+                    last = num;
+
+                    j = i + 1;
                 }
+                v @ '1'..='9' => {
+                    let num = v as u8 - b'0';
+                    last = num;
 
-                match c {
-                    '1' => {
-                        if first.is_none() {
-                            first = Some(10 * 1);
-                        }
-                        last = 1;
-
-                        tmp.clear();
-                    }
-                    '2' => {
-                        if first.is_none() {
-                            first = Some(10 * 2);
-                        }
-                        last = 2;
-                        tmp.clear();
-                    }
-                    '3' => {
-                        if first.is_none() {
-                            first = Some(10 * 3);
-                        }
-                        last = 3;
-                        tmp.clear();
-                    }
-                    '4' => {
-                        if first.is_none() {
-                            first = Some(10 * 4);
-                        }
-                        last = 4;
-                        tmp.clear();
-                    }
-                    '5' => {
-                        if first.is_none() {
-                            first = Some(10 * 5);
-                        }
-                        last = 5;
-                        tmp.clear();
-                    }
-                    '6' => {
-                        if first.is_none() {
-                            first = Some(10 * 6);
-                        }
-                        last = 6;
-                        tmp.clear();
-                    }
-                    '7' => {
-                        if first.is_none() {
-                            first = Some(10 * 7);
-                        }
-                        last = 7;
-                        tmp.clear();
-                    }
-                    '8' => {
-                        if first.is_none() {
-                            first = Some(10 * 8);
-                        }
-                        last = 8;
-                        tmp.clear();
-                    }
-                    '9' => {
-                        if first.is_none() {
-                            first = Some(10 * 9);
-                        }
-                        last = 9;
-                        tmp.clear();
-                    }
-
-                    c => {
-                        tmp.push_back(*c);
-                    }
+                    j = i + 1;
                 }
+                _ => (),
+            }
+            window.push(c);
 
-                if let Some(digit) = get_digit(tmp.make_contiguous()) {
-                    if first.is_none() {
-                        first = Some(10 * digit);
+            if window.len() - j >= 3 {
+                if let Some(digit) = get_digit(&window[j..]) {
+                    if first == 0 {
+                        first = 10 * digit;
                     }
                     last = digit;
                 }
             }
-
-            if let Some(digit) = get_digit(tmp.make_contiguous()) {
-                if first.is_none() {
-                    first = Some(10 * digit);
-                }
-                last = digit;
-            }
-
-            total += first.unwrap_or(0) as u64 + last as u64;
         }
 
-        println!("total = {}", total);
+        if let Some(digit) = get_digit(&window[j..]) {
+            if first == 0 {
+                first = 10 * digit;
+            }
+            last = digit;
+        }
+
+        total += first as u64 + last as u64;
+    }
+
+    total
+}
+
+fn main() {
+    for input in INPUTS.iter() {
+        println!("total = {}", process(input));
     }
 }
 
-fn get_digit(set: &[char]) -> Option<u8> {
+#[inline]
+const fn get_digit(set: &[char]) -> Option<u8> {
     match set {
         ['t', 'h', 'r', 'e', 'e'] => Some(3),
         ['s', 'e', 'v', 'e', 'n'] => Some(7),
@@ -131,4 +85,12 @@ fn get_digit(set: &[char]) -> Option<u8> {
         ['f', 'i', 'v', 'e', _] | ['f', 'i', 'v', 'e'] | [_, 'f', 'i', 'v', 'e'] => Some(5),
         _ => None,
     }
+}
+
+#[bench]
+fn part2(b: &mut test::Bencher) {
+    b.iter(|| {
+        let v = process(INPUTS[1]);
+        test::black_box(v);
+    });
 }
