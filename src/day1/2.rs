@@ -1,16 +1,17 @@
 #![feature(test)]
 extern crate test;
 
-const INPUTS: [&str; 2] = [include_str!("./sample.txt"), include_str!("./input.txt")];
+const INPUTS: [&[u8]; 2] = [
+    include_bytes!("./sample.txt"),
+    include_bytes!("./input.txt"),
+];
 
-fn process(data: &str) -> u64 {
+fn process(data: &[u8]) -> u64 {
     let mut total: u64 = 0;
 
-    for line in data.split('\n') {
-        let line: Vec<char> = line.chars().collect();
-
-        let first = 10 * find_forward(&line);
-        let last = find_backward(&line);
+    for line in data.split(|&x| x == b'\n') {
+        let first = 10 * find_forward(line);
+        let last = find_backward(line);
 
         total += first as u64 + last as u64;
     }
@@ -18,13 +19,13 @@ fn process(data: &str) -> u64 {
     total
 }
 
-fn find_forward(iter: &[char]) -> u8 {
+fn find_forward(iter: &[u8]) -> u8 {
     let mut start = 0;
     let mut end = 0;
 
     for c in iter.iter() {
-        if ('1'..='9').contains(c) {
-            return *c as u8 - b'0';
+        if (b'1'..=b'9').contains(c) {
+            return c - b'0';
         }
 
         if end - start >= 5 {
@@ -41,7 +42,7 @@ fn find_forward(iter: &[char]) -> u8 {
 
     get_digit(&iter[start..end]).unwrap_or(0)
 }
-fn find_backward(iter: &[char]) -> u8 {
+fn find_backward(iter: &[u8]) -> u8 {
     if iter.is_empty() {
         return 0;
     }
@@ -49,8 +50,8 @@ fn find_backward(iter: &[char]) -> u8 {
     let mut end = iter.len();
 
     for c in iter.iter().rev() {
-        if ('1'..='9').contains(c) {
-            return *c as u8 - b'0';
+        if (b'1'..=b'9').contains(c) {
+            return c - b'0';
         }
         if end - start >= 5 {
             end -= 1;
@@ -75,23 +76,36 @@ fn main() {
 }
 
 #[inline]
-const fn get_digit(set: &[char]) -> Option<u8> {
+const fn get_digit(set: &[u8]) -> Option<u8> {
     match set {
-        ['t', 'h', 'r', 'e', 'e'] => Some(3),
-        ['s', 'e', 'v', 'e', 'n'] => Some(7),
-        ['e', 'i', 'g', 'h', 't'] => Some(8),
-        ['o', 'n', 'e', _, _] | ['o', 'n', 'e'] | [_, 'o', 'n', 'e'] | [_, _, 'o', 'n', 'e'] => {
-            Some(1)
+        [b't', b'h', b'r', b'e', b'e'] => Some(3),
+        [b's', b'e', b'v', b'e', b'n'] => Some(7),
+        [b'e', b'i', b'g', b'h', b't'] => Some(8),
+
+        [b'o', b'n', b'e', _, _]
+        | [b'o', b'n', b'e']
+        | [_, b'o', b'n', b'e']
+        | [_, _, b'o', b'n', b'e'] => Some(1),
+
+        [b't', b'w', b'o', _, _]
+        | [b't', b'w', b'o']
+        | [_, b't', b'w', b'o']
+        | [_, _, b't', b'w', b'o'] => Some(2),
+
+        [b's', b'i', b'x', _, _]
+        | [b's', b'i', b'x']
+        | [_, b's', b'i', b'x']
+        | [_, _, b's', b'i', b'x'] => Some(6),
+
+        [b'n', b'i', b'n', b'e', _] | [b'n', b'i', b'n', b'e'] | [_, b'n', b'i', b'n', b'e'] => {
+            Some(9)
         }
-        ['t', 'w', 'o', _, _] | ['t', 'w', 'o'] | [_, 't', 'w', 'o'] | [_, _, 't', 'w', 'o'] => {
-            Some(2)
+        [b'f', b'o', b'u', b'r', _] | [b'f', b'o', b'u', b'r'] | [_, b'f', b'o', b'u', b'r'] => {
+            Some(4)
         }
-        ['s', 'i', 'x', _, _] | ['s', 'i', 'x'] | [_, 's', 'i', 'x'] | [_, _, 's', 'i', 'x'] => {
-            Some(6)
+        [b'f', b'i', b'v', b'e', _] | [b'f', b'i', b'v', b'e'] | [_, b'f', b'i', b'v', b'e'] => {
+            Some(5)
         }
-        ['n', 'i', 'n', 'e', _] | ['n', 'i', 'n', 'e'] | [_, 'n', 'i', 'n', 'e'] => Some(9),
-        ['f', 'o', 'u', 'r', _] | ['f', 'o', 'u', 'r'] | [_, 'f', 'o', 'u', 'r'] => Some(4),
-        ['f', 'i', 'v', 'e', _] | ['f', 'i', 'v', 'e'] | [_, 'f', 'i', 'v', 'e'] => Some(5),
         _ => None,
     }
 }

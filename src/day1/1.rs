@@ -1,32 +1,35 @@
 #![feature(test)]
 extern crate test;
 
-const INPUTS: [&'static str; 2] = [include_str!("./sample.txt"), include_str!("./input.txt")];
+const INPUTS: [&[u8]; 2] = [
+    include_bytes!("./sample.txt"),
+    include_bytes!("./input.txt"),
+];
 
 fn main() {
     for input in INPUTS.iter() {
-        let mut total = 0;
-        for line in input.split('\n') {
-            total += process(line);
-        }
-
-        println!("total = {}", total);
+        println!("total = {}", process(input));
     }
 }
 
-fn process(data: &str) -> u32 {
-    let first = data
-        .chars()
-        .find(|c| c.is_numeric())
-        .map_or(0, |x| 10 * x.to_digit(10).unwrap());
+fn process(input: &[u8]) -> u32 {
+    let mut total = 0;
+    for line in input.split(|&x| x == b'\n') {
+        let first = line
+            .iter()
+            .find(|c| c.is_ascii_digit())
+            .map_or(0, |x| 10 * (x - b'0'));
 
-    let last = data
-        .chars()
-        .rev()
-        .find(|c| c.is_numeric())
-        .map_or(0, |x| x.to_digit(10).unwrap());
+        let last = line
+            .iter()
+            .rev()
+            .find(|c| c.is_ascii_digit())
+            .map_or(0, |x| x - b'0');
 
-    first + last
+        total += first as u32 + last as u32;
+    }
+
+    total
 }
 
 #[bench]
