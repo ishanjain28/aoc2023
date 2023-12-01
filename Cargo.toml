@@ -4,6 +4,19 @@ version = "0.1.0"
 edition = "2021"
 default-run = "main"
 
+[profile.dev]
+opt-level = 3
+debug = false
+strip-debuginfo = 'off'
+strip = false
+debug-assertions = false
+overflow-checks = false
+lto = false
+panic = 'unwind'
+incremental = false
+codegen-units = 16
+rpath = false
+
 [dependencies]
 ureq = { version = "2.9.1" }
 
