@@ -7,7 +7,6 @@ default-run = "main"
 [profile.dev]
 opt-level = 3
 debug = false
-strip-debuginfo = 'off'
 strip = false
 debug-assertions = false
 overflow-checks = false
@@ -18,7 +17,6 @@ codegen-units = 16
 rpath = false
 
 [dependencies]
-tap = "1.0.1"
 ureq = { version = "2.9.1" }
 
 
