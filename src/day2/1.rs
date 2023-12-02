@@ -3,14 +3,15 @@ extern crate test;
 
 const INPUTS: [&str; 2] = [include_str!("./sample.txt"), include_str!("./input.txt")];
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum Move {
     Red(u32),
     Green(u32),
     Blue(u32),
+    Unknown,
 }
 
-fn process(data: &str) -> u32 {
+fn process(data: &str) -> u64 {
     let mut total = 0;
 
     for line in data.lines() {
@@ -20,26 +21,24 @@ fn process(data: &str) -> u32 {
         let (gid, remain) = line.split_once(':').unwrap();
 
         let gid = gid
-            .chars()
-            .filter(|c| c.is_numeric())
-            .collect::<String>()
-            .parse::<u32>()
+            .split_once(' ')
+            .map(|(_, x)| x.parse::<u64>().unwrap())
             .unwrap();
 
         let moves = remain.split(';').map(|x| {
-            let mut output = vec![];
+            let mut output = 0u64;
             let cubes = x.split(',');
 
             for cube in cubes {
                 let cube = cube.trim();
                 let (count, color) = cube.split_once(' ').unwrap();
 
-                let count = count.parse::<u32>().unwrap();
+                let count = count.parse::<u64>().unwrap();
 
                 match color {
-                    "red" => output.push(Move::Red(count)),
-                    "green" => output.push(Move::Green(count)),
-                    "blue" => output.push(Move::Blue(count)),
+                    "red" => output |= count << 32,
+                    "green" => output |= count << 16,
+                    "blue" => output |= count,
                     _ => unreachable!(),
                 }
             }
@@ -48,24 +47,14 @@ fn process(data: &str) -> u32 {
         });
 
         let mut possible = true;
-        'outer: for mmove in moves {
-            for step in mmove {
-                match step {
-                    Move::Red(v) if v > 12 => {
-                        possible = false;
-                        break 'outer;
-                    }
-                    Move::Green(v) if v > 13 => {
-                        possible = false;
-                        break 'outer;
-                    }
-                    Move::Blue(v) if v > 14 => {
-                        possible = false;
-                        break 'outer;
-                    }
+        for mmove in moves {
+            let red = (mmove & (0xffff << 32)) >> 32;
+            let green = (mmove & (0xffff << 16)) >> 16;
+            let blue = mmove & (0xffff);
 
-                    _ => (),
-                }
+            if red > 12 || green > 13 || blue > 14 {
+                possible = false;
+                break;
             }
         }
         if possible {

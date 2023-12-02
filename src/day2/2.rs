@@ -3,14 +3,7 @@ extern crate test;
 
 const INPUTS: [&str; 2] = [include_str!("./sample.txt"), include_str!("./input.txt")];
 
-#[derive(Debug)]
-pub enum Move {
-    Red(u32),
-    Green(u32),
-    Blue(u32),
-}
-
-fn process(data: &str) -> u32 {
+fn process(data: &str) -> u64 {
     let mut total = 0;
 
     for line in data.lines() {
@@ -19,20 +12,20 @@ fn process(data: &str) -> u32 {
         }
         let (_, remain) = line.split_once(':').unwrap();
 
-        let moves = remain.split(';').flat_map(|x| {
-            let mut output = vec![];
+        let moves = remain.split(';').map(|x| {
+            let mut output = 0u64;
             let cubes = x.split(',');
 
             for cube in cubes {
                 let cube = cube.trim();
                 let (count, color) = cube.split_once(' ').unwrap();
 
-                let count = count.parse::<u32>().unwrap();
+                let count = count.parse::<u64>().unwrap();
 
                 match color {
-                    "red" => output.push(Move::Red(count)),
-                    "green" => output.push(Move::Green(count)),
-                    "blue" => output.push(Move::Blue(count)),
+                    "red" => output |= count << 32,
+                    "green" => output |= count << 16,
+                    "blue" => output |= count,
                     _ => unreachable!(),
                 }
             }
@@ -45,11 +38,13 @@ fn process(data: &str) -> u32 {
         let mut min_blue = 0;
 
         for mmove in moves {
-            match mmove {
-                Move::Red(v) => min_red = std::cmp::max(min_red, v),
-                Move::Green(v) => min_green = std::cmp::max(min_green, v),
-                Move::Blue(v) => min_blue = std::cmp::max(min_blue, v),
-            }
+            let red = (mmove & (0xffff << 32)) >> 32;
+            let green = (mmove & (0xffff << 16)) >> 16;
+            let blue = mmove & 0xffff;
+
+            min_red = min_red.max(red);
+            min_green = min_green.max(green);
+            min_blue = min_blue.max(blue);
         }
 
         total += min_red * min_green * min_blue;
