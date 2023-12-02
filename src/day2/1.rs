@@ -25,18 +25,21 @@ fn process(data: &[u8]) -> u64 {
                     line = &l[3..];
                     if num > 12 {
                         possible = false;
+                        break;
                     }
                 }
                 [b'g', ..] => {
                     line = &l[5..];
                     if num > 13 {
                         possible = false;
+                        break;
                     }
                 }
                 [b'b', ..] => {
                     line = &l[4..];
                     if num > 14 {
                         possible = false;
+                        break;
                     }
                 }
                 [b' ', ..] => line = l,
