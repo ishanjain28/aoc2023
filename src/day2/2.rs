@@ -1,56 +1,73 @@
+#![feature(slice_split_once)]
 #![feature(test)]
 extern crate test;
 
-const INPUTS: [&str; 2] = [include_str!("./sample.txt"), include_str!("./input.txt")];
+const INPUTS: [&[u8]; 2] = [
+    include_bytes!("./sample.txt"),
+    include_bytes!("./input.txt"),
+];
 
-fn process(data: &str) -> u64 {
+fn process(data: &[u8]) -> u64 {
     let mut total = 0;
 
-    for line in data.lines() {
+    for line in data.split(|&x| x == b'\n') {
         if line.is_empty() {
             continue;
         }
-        let (_, remain) = line.split_once(':').unwrap();
-
-        let moves = remain.split(';').map(|x| {
-            let mut output = 0u64;
-            let cubes = x.split(',');
-
-            for cube in cubes {
-                let cube = cube.trim();
-                let (count, color) = cube.split_once(' ').unwrap();
-
-                let count = count.parse::<u64>().unwrap();
-
-                match color {
-                    "red" => output |= count << 32,
-                    "green" => output |= count << 16,
-                    "blue" => output |= count,
-                    _ => unreachable!(),
-                }
-            }
-
-            output
-        });
-
         let mut min_red = 0;
         let mut min_green = 0;
         let mut min_blue = 0;
 
-        for mmove in moves {
-            let red = (mmove & (0xffff << 32)) >> 32;
-            let green = (mmove & (0xffff << 16)) >> 16;
-            let blue = mmove & 0xffff;
+        let line = &line[5..];
+        let (_, mut line) = read_int(line);
 
-            min_red = min_red.max(red);
-            min_green = min_green.max(green);
-            min_blue = min_blue.max(blue);
+        while !line.is_empty() {
+            let (num, l) = read_int(&line[1..]);
+
+            match l {
+                [b'r', ..] => {
+                    min_red = min_red.max(num);
+                    line = &l[3..];
+                }
+                [b'g', ..] => {
+                    min_green = min_green.max(num);
+                    line = &l[5..];
+                }
+                [b'b', ..] => {
+                    min_blue = min_blue.max(num);
+                    line = &l[4..];
+                }
+                [b' ', ..] => line = l,
+                _ => (),
+            }
         }
 
         total += min_red * min_green * min_blue;
     }
 
     total
+}
+
+fn read_int(line: &[u8]) -> (u64, &[u8]) {
+    let mut num = 0u64;
+    let mut multiplier = 10_000u64;
+    let mut ops_done = 0;
+
+    for i in 0..line.len() {
+        let c = line[i];
+
+        if c.is_ascii_digit() {
+            let c = line[i] - b'0';
+            ops_done += 1;
+            num += multiplier * c as u64;
+            multiplier /= 10;
+        } else if num != 0 {
+            return (num / (10u64.pow(5 - ops_done)), &line[i + 1..]);
+        } else {
+            break;
+        }
+    }
+    (num / (10u64.pow(5 - ops_done)), line)
 }
 
 fn main() {

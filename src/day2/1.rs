@@ -1,68 +1,77 @@
 #![feature(test)]
 extern crate test;
 
-const INPUTS: [&str; 2] = [include_str!("./sample.txt"), include_str!("./input.txt")];
+const INPUTS: [&[u8]; 2] = [
+    include_bytes!("./sample.txt"),
+    include_bytes!("./input.txt"),
+];
 
-#[derive(Debug, Copy, Clone)]
-pub enum Move {
-    Red(u32),
-    Green(u32),
-    Blue(u32),
-    Unknown,
-}
-
-fn process(data: &str) -> u64 {
+fn process(data: &[u8]) -> u64 {
     let mut total = 0;
 
-    for line in data.lines() {
+    for line in data.split(|&x| x == b'\n') {
         if line.is_empty() {
             continue;
         }
-        let (gid, remain) = line.split_once(':').unwrap();
-
-        let gid = gid
-            .split_once(' ')
-            .map(|(_, x)| x.parse::<u64>().unwrap())
-            .unwrap();
-
-        let moves = remain.split(';').map(|x| {
-            let mut output = 0u64;
-            let cubes = x.split(',');
-
-            for cube in cubes {
-                let cube = cube.trim();
-                let (count, color) = cube.split_once(' ').unwrap();
-
-                let count = count.parse::<u64>().unwrap();
-
-                match color {
-                    "red" => output |= count << 32,
-                    "green" => output |= count << 16,
-                    "blue" => output |= count,
-                    _ => unreachable!(),
-                }
-            }
-
-            output
-        });
-
+        let line = &line[5..];
+        let (gid, mut line) = read_int(line);
         let mut possible = true;
-        for mmove in moves {
-            let red = (mmove & (0xffff << 32)) >> 32;
-            let green = (mmove & (0xffff << 16)) >> 16;
-            let blue = mmove & (0xffff);
 
-            if red > 12 || green > 13 || blue > 14 {
-                possible = false;
-                break;
+        while !line.is_empty() {
+            let (num, l) = read_int(&line[1..]);
+
+            match l {
+                [b'r', ..] => {
+                    line = &l[3..];
+                    if num > 12 {
+                        possible = false;
+                    }
+                }
+                [b'g', ..] => {
+                    line = &l[5..];
+                    if num > 13 {
+                        possible = false;
+                    }
+                }
+                [b'b', ..] => {
+                    line = &l[4..];
+                    if num > 14 {
+                        possible = false;
+                    }
+                }
+                [b' ', ..] => line = l,
+                _ => (),
             }
         }
+
         if possible {
             total += gid;
         }
     }
 
     total
+}
+
+fn read_int(line: &[u8]) -> (u64, &[u8]) {
+    let mut num = 0u64;
+    let mut multiplier = 10_000u64;
+    let mut ops_done = 0;
+
+    for i in 0..line.len() {
+        let c = line[i];
+
+        if c.is_ascii_digit() {
+            let c = line[i] - b'0';
+            ops_done += 1;
+            num += multiplier * c as u64;
+            multiplier /= 10;
+        } else if num != 0 {
+            return (num / (10u64.pow(5 - ops_done)), &line[i + 1..]);
+        } else {
+            break;
+        }
+    }
+    (num / (10u64.pow(5 - ops_done)), line)
 }
 
 fn main() {
