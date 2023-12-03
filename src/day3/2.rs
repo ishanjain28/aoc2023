@@ -79,11 +79,14 @@ fn process(data: &[u8]) -> u64 {
     total
 }
 
+#[inline]
 fn parse(b: &[u8]) -> u64 {
     let mut output = 0;
+    let mut pow = 1;
 
-    for (i, v) in b.iter().enumerate() {
-        output += 10u64.pow(b.len() as u32 - i as u32 - 1) * ((v - b'0') as u64);
+    for v in b.iter().rev() {
+        output += pow * ((v - b'0') as u64);
+        pow *= 10;
     }
 
     output
