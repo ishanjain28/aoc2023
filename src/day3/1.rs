@@ -43,7 +43,6 @@ fn process(data: &[u8]) -> u64 {
             }
 
             let mut valid = false;
-
             'outer: for (a, b) in DIRS.iter() {
                 let x = i as i32 + a;
 

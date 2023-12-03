@@ -1,6 +1,6 @@
 #![feature(test)]
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 extern crate test;
 
 const INPUTS: [&[u8]; 2] = [
@@ -30,13 +30,10 @@ fn process(data: &[u8]) -> u64 {
     let m = grid.len();
     let n = grid[0].len();
 
-    let mut map = HashMap::with_capacity(200);
-
+    let mut set = HashSet::with_capacity(2);
     for i in 0..m {
         for j in 0..n {
-            let c = grid[i][j];
-
-            if c != b'*' {
+            if grid[i][j] != b'*' {
                 continue;
             }
 
@@ -65,26 +62,31 @@ fn process(data: &[u8]) -> u64 {
                     ey += 1;
                 }
 
-                let num = String::from_utf8_lossy(&grid[x][sy..ey])
-                    .parse::<u64>()
-                    .unwrap();
+                // only insert valid parts in this
+                if set.len() < 2 {
+                    set.insert((parse(&grid[x][sy..ey]), sy, ey, x));
+                }
+            }
 
-                map.entry((i, j))
-                    .or_insert_with(HashSet::new)
-                    .insert((num, x, sy, ey));
+            if set.len() == 2 {
+                total += set.drain().fold(1, |a, (x, _, _, _)| a * x);
+            } else {
+                set.clear();
             }
         }
     }
 
-    for v in map.into_values() {
-        if v.len() < 2 {
-            continue;
-        }
+    total
+}
 
-        total += v.into_iter().fold(1, |a, (b, _, _, _)| a * b);
+fn parse(b: &[u8]) -> u64 {
+    let mut output = 0;
+
+    for (i, v) in b.iter().enumerate() {
+        output += 10u64.pow(b.len() as u32 - i as u32 - 1) * ((v - b'0') as u64);
     }
 
-    total
+    output
 }
 
 fn main() {
