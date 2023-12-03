@@ -8,6 +8,17 @@ const INPUTS: [&[u8]; 2] = [
     include_bytes!("./input.txt"),
 ];
 
+const DIRS: [(i32, i32); 8] = [
+    (0, 1),
+    (1, 0),
+    (0, -1),
+    (-1, 0),
+    (1, 1),
+    (-1, 1),
+    (1, -1),
+    (-1, -1),
+];
+
 fn process(data: &[u8]) -> u64 {
     let mut total = 0;
 
@@ -19,72 +30,58 @@ fn process(data: &[u8]) -> u64 {
     let m = grid.len();
     let n = grid[0].len();
 
-    let mut map = HashMap::new();
+    let mut map = HashMap::with_capacity(200);
 
     for i in 0..m {
-        let mut j = 0;
-        while j < n {
-            if (b'1'..=b'9').contains(&grid[i][j]) {
-                let int: Vec<u8> = grid[i]
-                    .iter()
-                    .skip(j)
-                    .take_while(|&c| c.is_ascii_digit())
-                    .cloned()
-                    .collect();
+        for j in 0..n {
+            let c = grid[i][j];
 
-                let num = String::from_utf8_lossy(&int).parse::<u64>().unwrap();
+            if c != b'*' {
+                continue;
+            }
 
-                let mut count = 0;
+            for (p, q) in DIRS.iter() {
+                let x = i as i32 + p;
+                let y = j as i32 + q;
 
-                let dirs = [
-                    (0, 1),
-                    (1, 0),
-                    (0, -1),
-                    (-1, 0),
-                    (1, 1),
-                    (-1, 1),
-                    (1, -1),
-                    (-1, -1),
-                ];
+                if x < 0
+                    || y < 0
+                    || x >= m as i32
+                    || y >= n as i32
+                    || !grid[x as usize][y as usize].is_ascii_digit()
+                {
+                    continue;
+                }
+                let x = x as usize;
+                let y = y as usize;
 
-                'outer: for (a, b) in dirs {
-                    let x = (i as i32 + a);
+                let mut sy = y;
+                let mut ey = y;
 
-                    for p in j..j + int.len() {
-                        let y = (p as i32 + b);
-
-                        if x < 0 || y < 0 || x >= m as i32 || y >= n as i32 {
-                            continue;
-                        }
-
-                        let c = grid[x as usize][y as usize];
-
-                        if c == b'*' {
-                            map.entry((x, y))
-                                .or_insert_with(HashSet::new)
-                                .insert((num, i, j));
-                        }
-                    }
+                while sy > 0 && grid[x][sy - 1].is_ascii_digit() {
+                    sy -= 1;
+                }
+                while ey < n && grid[x][ey].is_ascii_digit() {
+                    ey += 1;
                 }
 
-                j += int.len();
-            } else {
-                j += 1;
+                let num = String::from_utf8_lossy(&grid[x][sy..ey])
+                    .parse::<u64>()
+                    .unwrap();
+
+                map.entry((i, j))
+                    .or_insert_with(HashSet::new)
+                    .insert((num, x, sy, ey));
             }
         }
     }
 
-    for v in map.values() {
+    for v in map.into_values() {
         if v.len() < 2 {
             continue;
         }
 
-        let mut product = 1;
-        for (num, _, _) in v.iter() {
-            product *= num;
-        }
-
-        total += product;
+        total += v.into_iter().fold(1, |a, (b, _, _, _)| a * b);
     }
 
     total

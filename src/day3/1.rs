@@ -1,9 +1,22 @@
 #![feature(test)]
+
+use std::ops::RangeBounds;
 extern crate test;
 
 const INPUTS: [&[u8]; 2] = [
     include_bytes!("./sample.txt"),
     include_bytes!("./input.txt"),
+];
+
+const DIRS: [(i32, i32); 8] = [
+    (0, 1),
+    (1, 0),
+    (0, -1),
+    (-1, 0),
+    (1, 1),
+    (-1, 1),
+    (1, -1),
+    (-1, -1),
 ];
 
 fn process(data: &[u8]) -> u64 {
@@ -20,54 +33,44 @@ fn process(data: &[u8]) -> u64 {
     for i in 0..m {
         let mut j = 0;
         while j < n {
-            if (b'1'..=b'9').contains(&grid[i][j]) {
-                let int: Vec<u8> = grid[i]
-                    .iter()
-                    .skip(j)
-                    .take_while(|&c| c.is_ascii_digit())
-                    .cloned()
-                    .collect();
+            if !(b'1'..=b'9').contains(&grid[i][j]) {
+                j += 1;
+                continue;
+            }
 
-                let mut valid = false;
+            let mut ey = j;
+            while ey < n && grid[i][ey].is_ascii_digit() {
+                ey += 1;
+            }
 
-                let dirs = [
-                    (0, 1),
-                    (1, 0),
-                    (0, -1),
-                    (-1, 0),
-                    (1, 1),
-                    (-1, 1),
-                    (1, -1),
-                    (-1, -1),
-                ];
+            let mut valid = false;
 
-                'outer: for (a, b) in dirs {
-                    let x = i as i32 + a;
+            'outer: for (a, b) in DIRS.iter() {
+                let x = i as i32 + a;
 
-                    for p in j..j + int.len() {
-                        let y = p as i32 + b;
+                for p in j..ey {
+                    let y = p as i32 + b;
 
-                        if x < 0 || y < 0 || x >= m as i32 || y >= n as i32 {
-                            continue;
-                        }
+                    if x < 0 || y < 0 || x >= m as i32 || y >= n as i32 {
+                        continue;
+                    }
 
-                        let c = grid[x as usize][y as usize];
-                        if c != b'.' && !c.is_ascii_digit() {
-                            valid = true;
-                            break 'outer;
-                        }
+                    let c = grid[x as usize][y as usize];
+                    if c != b'.' && !c.is_ascii_digit() {
+                        valid = true;
+                        break 'outer;
                     }
                 }
-
-                if valid {
-                    let num = String::from_utf8_lossy(&int).parse::<u64>().unwrap();
-                    total += num
-                }
-
-                j += int.len();
-            } else {
-                j += 1;
             }
+
+            if valid {
+                let num = String::from_utf8_lossy(&grid[i][j..ey])
+                    .parse::<u64>()
+                    .unwrap();
+                total += num
+            }
+
+            j += ey - j;
         }
     }
 
