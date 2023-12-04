@@ -9,19 +9,28 @@ const INPUTS: [&[u8]; 2] = [
 
 fn process(data: &[u8]) -> u64 {
     let mut total = 0;
+    let mut colon_pos = 0;
+    let mut vert_tab_pos = 0;
 
     for data in data.split(|&x| x == b'\n') {
         if data.is_empty() {
             continue;
         }
+        if colon_pos == 0 || vert_tab_pos == 0 {
+            colon_pos = data.iter().position(|&x| x == b':').unwrap();
+            vert_tab_pos = data.iter().position(|&x| x == b'|').unwrap();
+        }
 
-        let (_, nums) = data.split_once(|&x| x == b':').unwrap();
+        let (_, nums) = data.split_at(colon_pos + 2);
 
-        let (nums, wins) = nums.split_once(|&x| x == b'|').unwrap();
+        let (nums, wins) = nums.split_at(vert_tab_pos + 1 - colon_pos - 2);
+
+        let nums = nums[..nums.len() - 2].split(|&x| x == b' ');
+        let wins = wins.split(|&x| x == b' ');
 
         let mut bit_map = BitMap::new();
 
-        for win in wins.split(|&x| x == b' ') {
+        for win in wins {
             if win.is_empty() {
                 continue;
             }
@@ -31,7 +40,7 @@ fn process(data: &[u8]) -> u64 {
         }
 
         let mut val = 0;
-        for num in nums.split(|&x| x == b' ') {
+        for num in nums {
             if num.is_empty() {
                 continue;
             }

@@ -9,32 +9,30 @@ const INPUTS: [&[u8]; 2] = [
 ];
 
 fn process(data: &[u8]) -> usize {
-    let mut cards = vec![];
+    let mut counter = vec![0];
+
+    let mut colon_pos = 0;
+    let mut vert_tab_pos = 0;
 
     for data in data.split(|&x| x == b'\n') {
         if data.is_empty() {
             continue;
         }
-        let (x, nums) = data.split_once(|&x| x == b':').unwrap();
+        if colon_pos == 0 || vert_tab_pos == 0 {
+            colon_pos = data.iter().position(|&x| x == b':').unwrap();
+            vert_tab_pos = data.iter().position(|&x| x == b'|').unwrap();
+        }
 
-        let id = parse(&x[5..]);
+        let (x, nums) = data.split_at(colon_pos + 2);
 
-        let (nums, wins) = nums.split_once(|&x| x == b'|').unwrap();
-        let nums = nums.split(|&x| x == b' ');
+        let id = parse(&x[4..x.len() - 2]);
+
+        let (nums, wins) = nums.split_at(vert_tab_pos + 1 - colon_pos - 2);
+
+        let nums = nums[..nums.len() - 2].split(|&x| x == b' ');
         let wins = wins.split(|&x| x == b' ');
 
-        let mut card = BitMap::new();
         let mut win = BitMap::new();
-
-        for num in nums {
-            if num.is_empty() {
-                continue;
-            }
-
-            let num = parse(num);
-
-            card.set(num);
-        }
 
         for w in wins {
             if w.is_empty() {
@@ -44,18 +42,14 @@ fn process(data: &[u8]) -> usize {
             win.set(num);
         }
 
-        cards.push((id, card, win));
-    }
+        let sum = nums
+            .into_iter()
+            .filter(|x| !x.is_empty())
+            .map(parse)
+            .fold(0, |a, x| a + win.get(x) as usize);
 
-    let mut counter = vec![1; cards.len() + 1];
-    counter[0] = 0;
-
-    for (id, card, wins) in cards.into_iter() {
-        let mut sum = 0;
-        for c in 0..100 {
-            if card.get(c) && wins.get(c) {
-                sum += 1;
-            }
+        if id + 1 + sum >= counter.len() {
+            counter.extend(std::iter::repeat(1).take(id + 1 + sum - counter.len()));
         }
 
         let cid = counter[id];
@@ -67,7 +61,7 @@ fn process(data: &[u8]) -> usize {
     counter.into_iter().sum::<usize>()
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 struct BitMap(u128);
 impl BitMap {
     #[inline]
@@ -93,7 +87,7 @@ fn parse(b: &[u8]) -> usize {
     let mut pow = 1;
     for c in b.iter().rev() {
         if !c.is_ascii_digit() {
-            continue;
+            break;
         }
         out += (c - b'0') as usize * pow;
         pow *= 10;
