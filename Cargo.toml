@@ -17,6 +17,7 @@ codegen-units = 16
 rpath = false
 
 [dependencies]
+fxhash = "0.2.1"
 ureq = { version = "2.9.1" }
 
 

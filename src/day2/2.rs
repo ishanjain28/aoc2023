@@ -77,7 +77,7 @@ fn main() {
 }
 
 #[bench]
-fn part1(b: &mut test::Bencher) {
+fn part2(b: &mut test::Bencher) {
     b.iter(|| {
         let v = process(INPUTS[1]);
         test::black_box(v);
