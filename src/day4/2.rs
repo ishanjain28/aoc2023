@@ -1,73 +1,105 @@
 #![feature(test)]
+#![feature(slice_split_once)]
 
-use std::collections::HashSet;
 extern crate test;
 
-const INPUTS: [&str; 2] = [include_str!("./sample.txt"), include_str!("./input.txt")];
+const INPUTS: [&[u8]; 2] = [
+    include_bytes!("./sample.txt"),
+    include_bytes!("./input.txt"),
+];
 
-fn process(data: &str) -> u64 {
+fn process(data: &[u8]) -> usize {
     let mut cards = vec![];
 
-    let mut total = 0;
-    for data in data.lines() {
-        let (x, nums) = data.split_once(':').unwrap();
+    for data in data.split(|&x| x == b'\n') {
+        if data.is_empty() {
+            continue;
+        }
+        let (x, nums) = data.split_once(|&x| x == b':').unwrap();
 
-        let v = x.split_at(4).1.trim();
-        let id = v.parse::<usize>().unwrap();
+        let id = parse(&x[5..]);
 
-        let (nums, wins) = nums.split_once('|').unwrap();
-        let nums: Vec<&str> = nums.split(' ').collect();
-        let wins: Vec<&str> = wins.split(' ').collect();
+        let (nums, wins) = nums.split_once(|&x| x == b'|').unwrap();
+        let nums = nums.split(|&x| x == b' ');
+        let wins = wins.split(|&x| x == b' ');
 
-        let mut card = vec![];
-        let mut win = HashSet::new();
+        let mut card = BitMap::new();
+        let mut win = BitMap::new();
 
         for num in nums {
             if num.is_empty() {
                 continue;
             }
 
-            let num = num.parse::<u64>().unwrap();
+            let num = parse(num);
 
-            card.push(num);
+            card.set(num);
         }
 
         for w in wins {
             if w.is_empty() {
                 continue;
             }
-            let num = w.parse::<u64>().unwrap();
-            win.insert(num);
+            let num = parse(w);
+            win.set(num);
         }
 
         cards.push((id, card, win));
     }
 
-    let mut stack: Vec<(usize, Vec<u64>, HashSet<u64>)> = cards.iter().rev().cloned().collect();
+    let mut counter = vec![1; cards.len() + 1];
+    counter[0] = 0;
 
-    let mut count = vec![0; cards.len() + 1];
-
-    while let Some((id, card, wins)) = stack.pop() {
+    for (id, card, wins) in cards.into_iter() {
         let mut sum = 0;
-        for c in card {
-            if wins.contains(&c) {
+        for c in 0..100 {
+            if card.get(c) && wins.get(c) {
                 sum += 1;
             }
         }
 
-        count[id] += 1;
-
-        for i in id..id + sum {
-            stack.push(cards[i].clone())
+        let cid = counter[id];
+        for c in counter.iter_mut().skip(id + 1).take(sum) {
+            *c += cid;
         }
     }
 
-    for c in count.iter().skip(1) {
-        total += c;
+    counter.into_iter().sum::<usize>()
+}
+
+#[derive(Clone)]
+struct BitMap(u128);
+impl BitMap {
+    #[inline]
+    pub const fn new() -> Self {
+        Self(0)
+    }
+    #[inline]
+    pub fn set(&mut self, idx: usize) {
+        debug_assert!(idx < 128);
+        self.0 |= 1 << idx;
+    }
+    #[inline]
+    pub const fn get(&self, idx: usize) -> bool {
+        debug_assert!(idx < 128);
+        (self.0 >> idx) & 1 == 1
+    }
+}
+
+#[inline]
+fn parse(b: &[u8]) -> usize {
+    let mut out = 0;
+
+    let mut pow = 1;
+    for c in b.iter().rev() {
+        if !c.is_ascii_digit() {
+            continue;
+        }
+        out += (c - b'0') as usize * pow;
+        pow *= 10;
     }
 
-    println!("{:?}", count);
-    total
+    out
 }
 
 fn main() {

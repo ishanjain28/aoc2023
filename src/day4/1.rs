@@ -1,8 +1,5 @@
 #![feature(slice_split_once)]
 #![feature(test)]
-
-use fxhash::FxHashSet;
-
 extern crate test;
 
 const INPUTS: [&[u8]; 2] = [
@@ -11,9 +8,8 @@ const INPUTS: [&[u8]; 2] = [
 ];
 
 fn process(data: &[u8]) -> u64 {
-    let mut win_num = FxHashSet::default();
-
     let mut total = 0;
+
     for data in data.split(|&x| x == b'\n') {
         if data.is_empty() {
             continue;
@@ -22,25 +18,26 @@ fn process(data: &[u8]) -> u64 {
         let (_, nums) = data.split_once(|&x| x == b':').unwrap();
 
         let (nums, wins) = nums.split_once(|&x| x == b'|').unwrap();
-        let nums = nums.split(|&x| x == b' ');
-        let wins = wins.split(|&x| x == b' ');
 
-        for win in wins {
+        let mut bit_map = BitMap::new();
+
+        for win in wins.split(|&x| x == b' ') {
             if win.is_empty() {
                 continue;
             }
             let win = parse(win);
 
-            win_num.insert(win);
+            bit_map.set(win);
         }
 
         let mut val = 0;
-        for num in nums {
+        for num in nums.split(|&x| x == b' ') {
             if num.is_empty() {
                 continue;
             }
             let num = parse(num);
-            if win_num.contains(&num) {
+
+            if bit_map.get(num) {
                 if val == 0 {
                     val = 1;
                 } else {
@@ -50,20 +47,36 @@ fn process(data: &[u8]) -> u64 {
         }
 
         total += val;
-
-        win_num.clear();
     }
 
     total
 }
 
+struct BitMap(u128);
+impl BitMap {
+    #[inline]
+    pub const fn new() -> Self {
+        Self(0)
+    }
+    #[inline]
+    pub fn set(&mut self, idx: usize) {
+        debug_assert!(idx < 128);
+        self.0 |= 1 << idx;
+    }
+    #[inline]
+    pub const fn get(&self, idx: usize) -> bool {
+        debug_assert!(idx < 128);
+        (self.0 >> idx) & 1 == 1
+    }
+}
+
 #[inline]
-fn parse(b: &[u8]) -> u64 {
+fn parse(b: &[u8]) -> usize {
     let mut out = 0;
 
     let mut pow = 1;
     for c in b.iter().rev() {
-        out += (c - b'0') as u64 * pow;
+        out += (c - b'0') as usize * pow;
         pow *= 10;
     }
 
