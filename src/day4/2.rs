@@ -8,7 +8,7 @@ const INPUTS: [&[u8]; 2] = [
     include_bytes!("./input.txt"),
 ];
 
-fn process(data: &[u8]) -> usize {
+fn process(data: &[u8]) -> u64 {
     let mut counter = vec![0];
 
     let mut colon_pos = 0;
@@ -25,27 +25,19 @@ fn process(data: &[u8]) -> usize {
 
         let (x, nums) = data.split_at(colon_pos + 2);
 
-        let id = parse(&x[4..x.len() - 2]);
+        let id = parse(&x[4..x.len() - 2]) as usize;
 
         let (nums, wins) = nums.split_at(vert_tab_pos + 1 - colon_pos - 2);
-
-        let nums = nums[..nums.len() - 2].split(|&x| x == b' ');
-        let wins = wins.split(|&x| x == b' ');
-
         let mut win = BitMap::new();
 
-        for w in wins {
-            if w.is_empty() {
-                continue;
-            }
-            let num = parse(w);
+        for c in wins.chunks_exact(3) {
+            let num = parse(&c[1..3]);
             win.set(num);
         }
 
         let sum = nums
-            .into_iter()
-            .filter(|x| !x.is_empty())
-            .map(parse)
+            .chunks_exact(3)
+            .map(|x| parse(&x[0..2]))
             .fold(0, |a, x| a + win.get(x) as usize);
 
         if id + 1 + sum >= counter.len() {
@@ -58,7 +50,7 @@ fn process(data: &[u8]) -> usize {
         }
     }
 
-    counter.into_iter().sum::<usize>()
+    counter.into_iter().sum::<u64>()
 }
 
 #[derive(Debug, Clone)]
@@ -69,31 +61,24 @@ impl BitMap {
         Self(0)
     }
     #[inline]
-    pub fn set(&mut self, idx: usize) {
+    pub fn set(&mut self, idx: u8) {
         debug_assert!(idx < 128);
         self.0 |= 1 << idx;
     }
     #[inline]
-    pub const fn get(&self, idx: usize) -> bool {
+    pub const fn get(&self, idx: u8) -> bool {
         debug_assert!(idx < 128);
         (self.0 >> idx) & 1 == 1
     }
 }
 
 #[inline]
-fn parse(b: &[u8]) -> usize {
-    let mut out = 0;
-
-    let mut pow = 1;
-    for c in b.iter().rev() {
-        if !c.is_ascii_digit() {
-            break;
-        }
-        out += (c - b'0') as usize * pow;
-        pow *= 10;
+const fn parse(b: &[u8]) -> u8 {
+    match b.len() {
+        2 => 10 * (b[0] & 0xf) + (b[1] & 0xf),
+        4 => 100 * (b[1] & 0xf) + 10 * (b[2] & 0xf) + (b[3] & 0xf),
+        _ => unreachable!(),
     }
-
-    out
 }
 
 fn main() {

@@ -1,5 +1,6 @@
 #![feature(slice_split_once)]
 #![feature(test)]
+
 extern crate test;
 
 const INPUTS: [&[u8]; 2] = [
@@ -22,30 +23,19 @@ fn process(data: &[u8]) -> u64 {
         }
 
         let (_, nums) = data.split_at(colon_pos + 2);
-
         let (nums, wins) = nums.split_at(vert_tab_pos + 1 - colon_pos - 2);
-
-        let nums = nums[..nums.len() - 2].split(|&x| x == b' ');
-        let wins = wins.split(|&x| x == b' ');
 
         let mut bit_map = BitMap::new();
 
-        for win in wins {
-            if win.is_empty() {
-                continue;
-            }
-            let win = parse(win);
+        for c in wins.chunks_exact(3) {
+            let num = parse(&c[1..3]);
 
-            bit_map.set(win);
+            bit_map.set(num);
         }
 
         let mut val = 0;
-        for num in nums {
-            if num.is_empty() {
-                continue;
-            }
-            let num = parse(num);
-
+        for c in nums.chunks_exact(3) {
+            let num = parse(&c[0..2]);
             if bit_map.get(num) {
                 if val == 0 {
                     val = 1;
@@ -68,28 +58,20 @@ impl BitMap {
         Self(0)
     }
     #[inline]
-    pub fn set(&mut self, idx: usize) {
+    pub fn set(&mut self, idx: u8) {
         debug_assert!(idx < 128);
         self.0 |= 1 << idx;
     }
     #[inline]
-    pub const fn get(&self, idx: usize) -> bool {
+    pub const fn get(&self, idx: u8) -> bool {
         debug_assert!(idx < 128);
         (self.0 >> idx) & 1 == 1
     }
 }
 
 #[inline]
-fn parse(b: &[u8]) -> usize {
-    let mut out = 0;
-
-    let mut pow = 1;
-    for c in b.iter().rev() {
-        out += (c - b'0') as usize * pow;
-        pow *= 10;
-    }
-
-    out
+const fn parse(b: &[u8]) -> u8 {
+    10 * (b[0] & 0xf) + (b[1] & 0xf)
 }
 
 fn main() {
