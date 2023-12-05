@@ -1,3 +1,4 @@
+#![feature(const_trait_impl)]
 #![feature(test)]
 
 use std::ops::Range;
@@ -40,79 +41,46 @@ fn process(data: &str) -> i64 {
             .collect::<Vec<(Range<i64>, Range<i64>)>>()
     });
 
+    let mut out = Vec::with_capacity(seeds.len());
     for map in maps {
-        let mut out = Vec::with_capacity(seeds.len());
+        for (src, dst) in map.iter() {
+            let mut i = 0;
+            while i < seeds.len() {
+                let seed = &seeds[i];
 
-        for seed in seeds {
-            //  split seed based on this rangemap
-            let splitted = split(&map, seed);
+                let [lno, overlap, rno] = intersect(src, &seed);
 
-            out.extend(splitted);
+                if !overlap.is_empty() {
+                    out.push(
+                        overlap.start - src.start + dst.start..overlap.end - src.start + dst.start,
+                    );
+                    seeds.swap_remove(i);
+
+                    if !lno.is_empty() {
+                        seeds.push(lno);
+                    }
+                    if !rno.is_empty() {
+                        seeds.push(rno);
+                    }
+                } else {
+                    i += 1;
+                }
+            }
         }
 
-        seeds = out
+        seeds.append(&mut out);
     }
 
     seeds.into_iter().map(|x| x.start).min().unwrap()
 }
 
-fn split(map: &[(Range<i64>, Range<i64>)], node: Range<i64>) -> Vec<Range<i64>> {
-    let mut out = Vec::with_capacity(map.len());
-    let mut stack = vec![node];
+#[inline]
+fn intersect(node: &Range<i64>, src: &Range<i64>) -> [Range<i64>; 3] {
+    let overlap = src.start.max(node.start)..src.end.min(node.end);
+    let left_nonoverlap = src.start..overlap.start;
+    let right_nonoverlap = overlap.end..src.end;
 
-    while let Some(node) = stack.pop() {
-        let mut found_match = false;
-
-        for (src, dst) in map
-            .iter()
-            .skip_while(|(src, _)| node.end.min(src.end) - node.start.max(src.start) <= 0)
-        {
-            let overlap = std::cmp::max(0, node.end.min(src.end) - node.start.max(src.start));
-            if overlap <= 0 {
-                break;
-            }
-
-            let dst = if node.start == src.start && node.end == src.end {
-                dst.clone()
-            } else if node.start >= src.start && node.end <= src.end {
-                // src engulfs node
-                let offset = std::cmp::max(0, node.start - src.start);
-
-                dst.start + offset..dst.start + offset + overlap
-            } else if node.start < src.start && node.end > src.end {
-                // node engulfs src
-                let r1_non = node.start..src.start;
-                let r2_non = src.end..node.end;
-
-                stack.extend([r1_non, r2_non]);
-
-                dst.clone()
-            } else {
-                // Partial overlap
-
-                let offset = std::cmp::max(0, node.start - src.start);
-                let dst_range = dst.start + offset..dst.start + offset + overlap;
-
-                let new_range = if node.start < src.start {
-                    node.start..src.start
-                } else {
-                    src.end..node.end
-                };
-
-                stack.push(new_range);
-                dst_range
-            };
-
-            found_match = true;
-            out.push(dst);
-        }
-
-        if !found_match {
-            out.push(node);
-        }
-    }
-
-    out
+    [left_nonoverlap, overlap, right_nonoverlap]
 }
 
 fn main() {
