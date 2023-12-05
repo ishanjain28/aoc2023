@@ -31,15 +31,13 @@ fn process(data: &str) -> i64 {
                 .lines()
                 .skip(1)
                 .map(|line| {
-                    line.split_ascii_whitespace()
+                    let y: Vec<i64> = line
+                        .split_ascii_whitespace()
                         .map(|y| y.parse::<i64>().unwrap())
-                        .array_chunks::<2>()
-                        .map(|y| {
-                            let size = y[2];
+                        .collect();
+                    let size = y[2];
 
-                            (y[1]..y[1] + size, y[0]..y[0] + size)
-                        })
-                        .collect()
+                    (y[1]..y[1] + size, y[0]..y[0] + size)
                 })
                 .collect()
         })
