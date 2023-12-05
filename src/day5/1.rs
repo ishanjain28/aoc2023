@@ -7,24 +7,22 @@ extern crate test;
 
 const INPUTS: [&str; 2] = [include_str!("./sample.txt"), include_str!("./input.txt")];
 
-fn process(data: &str) -> u64 {
+fn process(data: &str) -> i64 {
     let mut lines = data.split("\n\n");
 
-    let seeds: Vec<u64> = lines
+    let seeds = lines
         .next()
-        .map(|x| x.split(' ').skip(1).map(|y| y.parse::<u64>().unwrap()))
-        .unwrap()
-        .collect();
-
-    let maps: Vec<Vec<(Range<u64>, Range<u64>)>> = lines
+        .map(|x| x.split(' ').skip(1).map(|y| y.parse::<i64>().unwrap()))
+        .unwrap();
+    let maps: Vec<Vec<(Range<i64>, Range<i64>)>> = lines
         .map(|lines| {
             lines
                 .lines()
                 .skip(1)
                 .map(|line| {
-                    let y: Vec<u64> = line
+                    let y: Vec<i64> = line
                         .split_ascii_whitespace()
-                        .map(|y| y.parse::<u64>().unwrap())
+                        .map(|y| y.parse::<i64>().unwrap())
                         .collect();
                     let size = y[2];
 
@@ -34,7 +32,7 @@ fn process(data: &str) -> u64 {
         })
         .collect();
 
-    let mut answer = std::u64::MAX;
+    let mut answer = std::i64::MAX;
 
     for mut src in seeds {
         for map in maps.iter() {
