@@ -2,48 +2,65 @@
 
 extern crate test;
 
-const INPUTS: [&str; 2] = [include_str!("./sample.txt"), include_str!("./input.txt")];
+const INPUTS: [&[u8]; 2] = [
+    include_bytes!("./sample.txt"),
+    include_bytes!("./input.txt"),
+];
 
-fn process(data: &str) -> i64 {
-    let mut data = data.lines();
+fn process(data: &[u8]) -> u64 {
+    let mut data = data.split(|&x| x == b'\n');
 
     let time = data
         .next()
         .map(|line| {
-            line.split(' ')
-                .filter(|x| !x.is_empty())
+            line.split(|&x| x == b' ')
                 .skip(1)
-                .map(|x| x.parse::<u64>().unwrap())
+                .filter(|c| !c.is_empty())
+                .map(|c| {
+                    let mut num = 0;
+                    let mut mul = 1;
+
+                    for c in c.iter().rev() {
+                        num += (c - b'0') as u64 * mul;
+                        mul *= 10;
+                    }
+
+                    num as f32
+                })
         })
         .unwrap();
 
     let distance = data
         .next()
         .map(|line| {
-            line.split(' ')
-                .filter(|x| !x.is_empty())
+            line.split(|&x| x == b' ')
                 .skip(1)
-                .map(|x| x.parse::<u64>().unwrap())
+                .filter(|c| !c.is_empty())
+                .map(|c| {
+                    let mut num = 0;
+                    let mut mul = 1;
+
+                    for c in c.iter().rev() {
+                        num += (c - b'0') as u64 * mul;
+                        mul *= 10;
+                    }
+
+                    num as f32
+                })
         })
         .unwrap();
 
     let mut answer = 1;
 
     for (time, dist) in time.zip(distance) {
-        let mut ways = 0;
+        let mut root1 = (time + (time * time - 4.0 * dist).sqrt()) / 2.0;
+        let root2 = (time - (time * time - 4.0 * dist).sqrt()) / 2.0;
 
-        for t in 0..time {
-            let time_left = time - t;
-            let speed = t;
-
-            let dist_traveled = time_left * speed;
-
-            if dist_traveled > dist {
-                ways += 1;
-            }
+        if root1.fract() == 0.0 && root2.fract() == 0.0 {
+            root1 -= 1.0;
         }
 
-        answer *= ways;
+        answer *= root1 as u64 - root2 as u64;
     }
 
     answer

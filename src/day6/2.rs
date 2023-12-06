@@ -2,42 +2,46 @@
 
 extern crate test;
 
-const INPUTS: [&str; 2] = [include_str!("./sample.txt"), include_str!("./input.txt")];
+const INPUTS: [&[u8]; 2] = [
+    include_bytes!("./sample.txt"),
+    include_bytes!("./input.txt"),
+];
 
-fn process(data: &str) -> i64 {
-    let mut data = data.lines();
+fn process(data: &[u8]) -> u64 {
+    let mut data = data.split(|&x| x == b'\n');
 
-    let time: u64 = data
+    let time: f64 = data
         .next()
         .map(|line| {
-            let x: String = line.chars().filter(|c| c.is_numeric()).collect();
-
-            x.parse::<u64>().unwrap()
+            let mut num = 0;
+            let mut mul = 1;
+            for c in line.iter().filter(|c| c.is_ascii_digit()).rev() {
+                num += (c - b'0') as u64 * mul;
+                mul *= 10;
+            }
+            num as f64
         })
-        .unwrap_or(0);
-    let distance: u64 = data
+        .unwrap_or(0.0);
+    let distance: f64 = data
         .next()
         .map(|line| {
-            let x: String = line.chars().filter(|c| c.is_numeric()).collect();
-
-            x.parse::<u64>().unwrap()
+            let mut num = 0;
+            let mut mul = 1;
+            for c in line.iter().filter(|c| c.is_ascii_digit()).rev() {
+                num += (c - b'0') as u64 * mul;
+                mul *= 10;
+            }
+            num as f64
         })
-        .unwrap_or(0);
+        .unwrap_or(0.0);
 
-    let mut answer = 0;
-
-    for t in 0..time {
-        let time_left = time - t;
-        let speed = t;
-
-        let dist_traveled = time_left * speed;
-
-        if dist_traveled > distance {
-            answer += 1;
-        }
+    let mut root1 = (time + (time.powi(2) - 4.0 * distance).sqrt()) / 2.0;
+    let root2 = (time - (time.powi(2) - 4.0 * distance).sqrt()) / 2.0;
+    if root1.fract() == 0.0 && root2.fract() == 0.0 {
+        root1 -= 1.0;
     }
 
-    answer
+    root1 as u64 - root2 as u64
 }
 
 fn main() {
