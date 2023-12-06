@@ -1,5 +1,4 @@
 #![feature(test)]
-#![feature(slice_split_once)]
 
 extern crate test;
 

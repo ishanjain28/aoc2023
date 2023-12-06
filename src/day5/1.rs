@@ -1,4 +1,3 @@
-#![feature(slice_split_once)]
 #![feature(test)]
 
 use std::ops::Range;
