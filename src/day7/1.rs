@@ -11,8 +11,8 @@ const INPUTS: [&[u8]; 2] = [
 ];
 
 #[derive(Debug)]
-struct Card<'a> {
-    val: &'a [u8],
+struct Card {
+    val: usize,
     set_type: SetType,
 }
 
@@ -29,7 +29,7 @@ enum SetType {
 
 const ARRAY_SIZE: usize = 15;
 
-fn process(data: &[u8]) -> u64 {
+fn process(data: &[u8]) -> usize {
     let mut answer = 0;
     let mut cards = vec![];
 
@@ -37,14 +37,14 @@ fn process(data: &[u8]) -> u64 {
         if data.is_empty() {
             continue;
         }
-        let (card, value) = data.split_at(6);
-        let card = card.trim_ascii();
+        let (card, value) = data.split_at(5);
+        let value = &value[1..];
 
         let mut arr = [0; ARRAY_SIZE];
 
         for &c in card {
             let c = card_weight(c);
-            arr[c as usize] += 1;
+            arr[c] += 1;
         }
         let transposed = transpose(&arr);
 
@@ -70,9 +70,15 @@ fn process(data: &[u8]) -> u64 {
         let mut pow = 1;
 
         for &val in value.iter().rev() {
-            num += (val - b'0') as u64 * pow;
+            num += (val - b'0') as usize * pow;
             pow *= 10;
         }
+
+        let card = (card_weight(card[0]) << 32)
+            + (card_weight(card[1]) << 24)
+            + (card_weight(card[2]) << 16)
+            + (card_weight(card[3]) << 8)
+            + card_weight(card[4]);
 
         cards.push((
             Card {
@@ -83,83 +89,25 @@ fn process(data: &[u8]) -> u64 {
         ));
     }
 
-    cards.sort_unstable_by(|(a, _), (b, _)| match (a.set_type, b.set_type) {
-        (x, y) if x == y => {
-            for (a, b) in a.val.iter().zip(b.val.iter()) {
-                let ordering = cmp(*a, *b);
+    cards.sort_unstable_by(|(a, _), (b, _)| -> Ordering {
+        match (a.set_type, b.set_type) {
+            (x, y) if x == y => a.val.cmp(&b.val),
+            (x, y) => {
+                let x = x as u8;
+                let y = y as u8;
 
-                if ordering != Ordering::Equal {
-                    return ordering;
-                }
+                x.cmp(&y)
             }
-
-            Ordering::Equal
-        }
-        (x, y) => {
-            let x = x as u8;
-            let y = y as u8;
-
-            x.cmp(&y)
         }
     });
 
     for (i, (_, v)) in cards.into_iter().enumerate() {
         let i = i + 1;
 
-        answer += v * i as u64;
+        answer += v * i;
     }
 
     answer
-}
-
-#[inline]
-const fn cmp(a: u8, b: u8) -> Ordering {
-    if a == b {
-        return Ordering::Equal;
-    }
-
-    match (a, b) {
-        (b'A', _) => Ordering::Greater,
-        (_, b'A') => Ordering::Less,
-
-        (b'K', _) => Ordering::Greater,
-        (_, b'K') => Ordering::Less,
-
-        (b'Q', _) => Ordering::Greater,
-        (_, b'Q') => Ordering::Less,
-
-        (b'J', _) => Ordering::Greater,
-        (_, b'J') => Ordering::Less,
-
-        (b'T', _) => Ordering::Greater,
-        (_, b'T') => Ordering::Less,
-
-        (b'9', _) => Ordering::Greater,
-        (_, b'9') => Ordering::Less,
-
-        (b'8', _) => Ordering::Greater,
-        (_, b'8') => Ordering::Less,
-
-        (b'7', _) => Ordering::Greater,
-        (_, b'7') => Ordering::Less,
-
-        (b'6', _) => Ordering::Greater,
-        (_, b'6') => Ordering::Less,
-
-        (b'5', _) => Ordering::Greater,
-        (_, b'5') => Ordering::Less,
-
-        (b'4', _) => Ordering::Greater,
-        (_, b'4') => Ordering::Less,
-
-        (b'3', _) => Ordering::Greater,
-        (_, b'3') => Ordering::Less,
-
-        (b'2', _) => Ordering::Greater,
-        (_, b'2') => Ordering::Less,
-
-        (_, _) => unreachable!(),
-    }
 }
 
 #[inline]
@@ -174,12 +122,12 @@ fn transpose(ip: &[u8; ARRAY_SIZE]) -> [u8; 6] {
 }
 
 #[inline]
-const fn card_weight(a: u8) -> u8 {
+const fn card_weight(a: u8) -> usize {
     match a {
-        b'2'..=b'9' => a - b'0',
+        b'2'..=b'9' => (a - b'0') as usize,
 
-        b'J' => 10,
-        b'T' => 11,
+        b'T' => 10,
+        b'J' => 11,
         b'Q' => 12,
         b'K' => 13,
         b'A' => 14,
