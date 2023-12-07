@@ -1,15 +1,19 @@
+#![feature(byte_slice_trim_ascii)]
 #![feature(test)]
 
 use std::cmp::Ordering;
 
 extern crate test;
 
-const INPUTS: [&str; 2] = [include_str!("./sample.txt"), include_str!("./input.txt")];
+const INPUTS: [&[u8]; 2] = [
+    include_bytes!("./sample.txt"),
+    include_bytes!("./input.txt"),
+];
 
 #[derive(Debug)]
-struct Card {
-    val: String,
-    ttype: SetType,
+struct Card<'a> {
+    val: &'a [u8],
+    set_type: SetType,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
@@ -23,59 +27,66 @@ enum SetType {
     High = 1,
 }
 
-fn process(data: &str) -> u64 {
-    let mut answer = 0;
+const ARRAY_SIZE: usize = 15;
 
+fn process(data: &[u8]) -> u64 {
+    let mut answer = 0;
     let mut cards = vec![];
 
-    for data in data.lines() {
+    for data in data.split(|&x| x == b'\n') {
         if data.is_empty() {
             continue;
         }
         let (card, value) = data.split_at(6);
-        let card = card.trim();
+        let card = card.trim_ascii();
 
-        let mut arr = [0; 255];
+        let mut arr = [0; ARRAY_SIZE];
 
-        for c in card.bytes() {
+        for &c in card {
+            let c = card_weight(c);
             arr[c as usize] += 1;
         }
+        let transposed = transpose(&arr);
 
-        let ttype = if arr.iter().any(|&x| x == 5) {
-            SetType::Five
-        } else if arr.iter().any(|&x| x == 4) && arr.iter().any(|&x| x == 1) {
-            SetType::Four
-        } else if arr.iter().any(|&x| x == 3) && arr.iter().any(|&x| x == 2) {
-            SetType::FullHouse
-        } else if arr.iter().any(|&x| x == 3) && arr.iter().filter(|&&x| x == 1).count() == 2 {
-            SetType::Three
-        } else if arr.iter().filter(|&&x| x == 2).count() == 2
-            && arr.iter().filter(|&&x| x == 1).count() == 1
-        {
-            SetType::Two
-        } else if arr.iter().filter(|&&x| x == 2).count() == 1
-            && arr.iter().filter(|&&x| x == 1).count() == 3
-        {
-            SetType::One
-        } else if arr.iter().all(|&x| x == 0 || x == 1) {
-            SetType::High
-        } else {
-            unreachable!()
+        let set_type = match transposed {
+            [_, _, _, _, _, 1] => SetType::Five,
+
+            [_, 1, _, _, 1, _] => SetType::Four,
+
+            [_, _, 1, 1, _, _] => SetType::FullHouse,
+
+            [_, 2, _, 1, _, _] => SetType::Three,
+
+            [_, 1, 2, _, _, _] => SetType::Two,
+
+            [_, 3, 1, _, _, _] => SetType::One,
+
+            [_, 5, _, _, _, _] => SetType::High,
+
+            _ => unreachable!(),
         };
+
+        let mut num = 0;
+        let mut pow = 1;
+
+        for &val in value.iter().rev() {
+            num += (val - b'0') as u64 * pow;
+            pow *= 10;
+        }
 
         cards.push((
             Card {
-                val: card.to_string(),
-                ttype,
+                val: card,
+                set_type,
             },
-            value,
+            num,
         ));
     }
 
-    cards.sort_unstable_by(|(a, _), (b, _)| match (a.ttype, b.ttype) {
+    cards.sort_unstable_by(|(a, _), (b, _)| match (a.set_type, b.set_type) {
         (x, y) if x == y => {
-            for (a, b) in a.val.chars().zip(b.val.chars()) {
-                let ordering = cmp(a, b);
+            for (a, b) in a.val.iter().zip(b.val.iter()) {
+                let ordering = cmp(*a, *b);
 
                 if ordering != Ordering::Equal {
                     return ordering;
@@ -93,7 +104,6 @@ fn process(data: &str) -> u64 {
     });
 
     for (i, (_, v)) in cards.into_iter().enumerate() {
-        let v = v.parse::<u64>().unwrap();
         let i = i + 1;
 
         answer += v * i as u64;
@@ -102,52 +112,79 @@ fn process(data: &str) -> u64 {
     answer
 }
 
-fn cmp(a: char, b: char) -> Ordering {
-    if let Ordering::Equal = a.cmp(&b) {
+#[inline]
+const fn cmp(a: u8, b: u8) -> Ordering {
+    if a == b {
         return Ordering::Equal;
     }
 
     match (a, b) {
-        ('A', _) => Ordering::Greater,
-        (_, 'A') => Ordering::Less,
+        (b'A', _) => Ordering::Greater,
+        (_, b'A') => Ordering::Less,
 
-        ('K', _) => Ordering::Greater,
-        (_, 'K') => Ordering::Less,
+        (b'K', _) => Ordering::Greater,
+        (_, b'K') => Ordering::Less,
 
-        ('Q', _) => Ordering::Greater,
-        (_, 'Q') => Ordering::Less,
+        (b'Q', _) => Ordering::Greater,
+        (_, b'Q') => Ordering::Less,
 
-        ('J', _) => Ordering::Greater,
-        (_, 'J') => Ordering::Less,
+        (b'J', _) => Ordering::Greater,
+        (_, b'J') => Ordering::Less,
 
-        ('T', _) => Ordering::Greater,
-        (_, 'T') => Ordering::Less,
+        (b'T', _) => Ordering::Greater,
+        (_, b'T') => Ordering::Less,
 
-        ('9', _) => Ordering::Greater,
-        (_, '9') => Ordering::Less,
+        (b'9', _) => Ordering::Greater,
+        (_, b'9') => Ordering::Less,
 
-        ('8', _) => Ordering::Greater,
-        (_, '8') => Ordering::Less,
+        (b'8', _) => Ordering::Greater,
+        (_, b'8') => Ordering::Less,
 
-        ('7', _) => Ordering::Greater,
-        (_, '7') => Ordering::Less,
+        (b'7', _) => Ordering::Greater,
+        (_, b'7') => Ordering::Less,
 
-        ('6', _) => Ordering::Greater,
-        (_, '6') => Ordering::Less,
+        (b'6', _) => Ordering::Greater,
+        (_, b'6') => Ordering::Less,
 
-        ('5', _) => Ordering::Greater,
-        (_, '5') => Ordering::Less,
+        (b'5', _) => Ordering::Greater,
+        (_, b'5') => Ordering::Less,
 
-        ('4', _) => Ordering::Greater,
-        (_, '4') => Ordering::Less,
+        (b'4', _) => Ordering::Greater,
+        (_, b'4') => Ordering::Less,
 
-        ('3', _) => Ordering::Greater,
-        (_, '3') => Ordering::Less,
+        (b'3', _) => Ordering::Greater,
+        (_, b'3') => Ordering::Less,
 
-        ('2', _) => Ordering::Greater,
-        (_, '2') => Ordering::Less,
+        (b'2', _) => Ordering::Greater,
+        (_, b'2') => Ordering::Less,
 
         (_, _) => unreachable!(),
+    }
+}
+
+#[inline]
+fn transpose(ip: &[u8; ARRAY_SIZE]) -> [u8; 6] {
+    let mut out = [0; 6];
+
+    for &v in ip {
+        out[v as usize] += 1;
+    }
+
+    out
+}
+
+#[inline]
+const fn card_weight(a: u8) -> u8 {
+    match a {
+        b'2'..=b'9' => a - b'0',
+
+        b'J' => 10,
+        b'T' => 11,
+        b'Q' => 12,
+        b'K' => 13,
+        b'A' => 14,
+
+        _ => 0,
     }
 }
 
@@ -158,7 +195,7 @@ fn main() {
 }
 
 #[bench]
-fn part2(b: &mut test::Bencher) {
+fn part1(b: &mut test::Bencher) {
     b.iter(|| {
         let v = process(INPUTS[1]);
         test::black_box(v);
