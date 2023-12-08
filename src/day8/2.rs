@@ -1,8 +1,6 @@
 #![feature(slice_split_once)]
 #![feature(test)]
 
-use std::collections::HashMap;
-
 extern crate test;
 
 const INPUTS: [&[u8]; 2] = [
@@ -13,8 +11,7 @@ const INPUTS: [&[u8]; 2] = [
 fn process(data: &[u8]) -> usize {
     let (seq, remain) = data.split_once(|&x| x == b'\n').unwrap();
 
-    let mut map = HashMap::new();
-
+    let mut map = vec![];
     for line in remain.split(|&x| x == b'\n').skip(1) {
         if line.is_empty() {
             continue;
@@ -22,28 +19,41 @@ fn process(data: &[u8]) -> usize {
         let (start, remain) = line.split_at(3);
         let (l, r) = (&remain[4..7], &remain[9..12]);
 
-        map.insert(start, (l, r));
+        // Pack data into 6 bytes each
+        let start = lut(start[0]) << 10 | lut(start[1]) << 5 | lut(start[2]);
+        let l = lut(l[0]) << 10 | lut(l[1]) << 5 | lut(l[2]);
+        let r = lut(r[0]) << 10 | lut(r[1]) << 5 | lut(r[2]);
+
+        if start >= map.len() {
+            map.extend(std::iter::repeat(None).take(start - map.len() + 1));
+        }
+
+        map[start] = Some((l, r));
     }
 
-    let mut a_set = vec![];
+    let mut set = vec![];
 
-    for &k in map
-        .keys()
-        .filter(|x| x.last().map_or(false, |&b| b == b'A'))
-    {
-        a_set.push(k);
+    const A: usize = lut(b'A');
+    const Z: usize = lut(b'Z');
+
+    for (i, _) in map.iter().enumerate().filter(|(_, v)| v.is_some()) {
+        let last = i & 0b11_111;
+        if last == A {
+            set.push(i);
+        }
     }
 
-    let mut tmp = Vec::with_capacity(a_set.len());
+    let mut tmp = Vec::with_capacity(set.len());
 
-    'outer: for mut node in a_set {
+    'outer: for mut node in set {
         for (i, ins) in seq.iter().cycle().enumerate() {
-            if node.last().map_or(false, |&b| b == b'Z') {
+            let last = node & 0b11_111;
+            if last == Z {
                 tmp.push(i);
                 continue 'outer;
             }
 
-            let (l, r) = map.get(node).unwrap();
+            let (l, r) = map[node].unwrap();
 
             match ins {
                 b'L' => node = l,
@@ -54,6 +64,16 @@ fn process(data: &[u8]) -> usize {
     }
 
     lcm(&tmp)
+}
+
+#[inline]
+const fn lut(c: u8) -> usize {
+    match c {
+        (b'0'..=b'9') => (c - b'0') as usize + 27,
+        (b'A'..=b'Z') => (c - b'A') as usize,
+
+        _ => unreachable!(),
+    }
 }
 
 fn lcm(a: &[usize]) -> usize {
