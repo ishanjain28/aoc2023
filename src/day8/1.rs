@@ -1,54 +1,64 @@
-#![feature(byte_slice_trim_ascii)]
+#![feature(slice_split_once)]
 #![feature(test)]
 
-use std::{cmp::Ordering, collections::HashMap};
+use std::collections::HashMap;
 
 extern crate test;
 
-const INPUTS: [&str; 2] = [include_str!("./sample.txt"), include_str!("./input.txt")];
+const INPUTS: [&[u8]; 2] = [
+    // RL
+    //
+    // AAA = (BBB, CCC)
+    // BBB = (DDD, EEE)
+    // CCC = (ZZZ, GGG)
+    // DDD = (DDD, DDD)
+    // EEE = (EEE, EEE)
+    // GGG = (GGG, GGG)
+    // ZZZ = (ZZZ, ZZZ)
+    &[
+        82, 76, 10, 10, 65, 65, 65, 32, 61, 32, 40, 66, 66, 66, 44, 32, 67, 67, 67, 41, 10, 66, 66,
+        66, 32, 61, 32, 40, 68, 68, 68, 44, 32, 69, 69, 69, 41, 10, 67, 67, 67, 32, 61, 32, 40, 90,
+        90, 90, 44, 32, 71, 71, 71, 41, 10, 68, 68, 68, 32, 61, 32, 40, 68, 68, 68, 44, 32, 68, 68,
+        68, 41, 10, 69, 69, 69, 32, 61, 32, 40, 69, 69, 69, 44, 32, 69, 69, 69, 41, 10, 71, 71, 71,
+        32, 61, 32, 40, 71, 71, 71, 44, 32, 71, 71, 71, 41, 10, 90, 90, 90, 32, 61, 32, 40, 90, 90,
+        90, 44, 32, 90, 90, 90, 41,
+    ],
+    include_bytes!("./input.txt"),
+];
 
-fn process(data: &str) -> usize {
-    let mut answer = 0;
-
-    let mut data = data.split("\n\n");
-
-    let seq: Vec<char> = data.next().map(|x| x.chars().collect()).unwrap();
+fn process(data: &[u8]) -> usize {
+    let (seq, remain) = data.split_once(|&x| x == b'\n').unwrap();
 
     let mut map = HashMap::new();
 
-    for line in data.next().unwrap().lines() {
-        let (start, remain) = line.split_once(" = ").unwrap();
-
-        let (l, r) = remain.split_once(',').unwrap();
-        let l: String = l.chars().filter(|x| x.is_ascii_alphabetic()).collect();
-        let r: String = r.chars().filter(|x| x.is_ascii_alphabetic()).collect();
+    for line in remain.split(|&x| x == b'\n').skip(1) {
+        if line.is_empty() {
+            continue;
+        }
+        let (start, remain) = line.split_at(3);
+        let (l, r) = (&remain[4..7], &remain[9..12]);
 
         map.insert(start, (l, r));
     }
 
-    let mut i = 0;
-    let mut pos = "AAA";
+    let mut pos: &[u8] = &[b'A', b'A', b'A'];
 
-    loop {
-        let step = seq[i % seq.len()];
-        if pos == "ZZZ" {
-            return answer;
+    for (i, ins) in seq.iter().cycle().enumerate() {
+        if pos == [b'Z', b'Z', b'Z'] {
+            return i;
         }
 
         let (l, r) = map.get(&pos).unwrap();
 
-        println!("pos = {} l = {} r = {}", pos, l, r);
-        match step {
-            'R' => pos = r,
-            'L' => pos = l,
-            _ => unreachable!(),
+        match ins {
+            b'L' => pos = l,
+            b'R' => pos = r,
+
+            _ => (),
         }
-
-        answer += 1;
-
-        i += 1;
     }
-    answer
+
+    0
 }
 
 fn main() {
