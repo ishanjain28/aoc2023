@@ -12,25 +12,26 @@ fn process(data: &str) -> i64 {
         if line.is_empty() {
             continue;
         }
-        let mut input: Vec<i64> = line.split(' ').map(|x| x.parse::<i64>().unwrap()).collect();
+        let input: Vec<i64> = line.split(' ').flat_map(|x| x.parse::<i64>()).collect();
 
-        let mut diffs = vec![input.clone()];
+        let mut diffs = vec![input];
 
-        while input.iter().any(|&x| x != 0) {
-            let diff: Vec<i64> = input.windows(2).map(|win| win[1] - win[0]).collect();
-            input = diff.clone();
+        while let Some(last) = diffs.last() {
+            if !last.iter().any(|&x| x != 0) {
+                break;
+            }
+            let diff: Vec<i64> = last.windows(2).map(|win| win[1] - win[0]).collect();
             diffs.push(diff);
         }
 
         let mut prev_inserted = 0;
-        for diff in diffs.iter_mut().rev() {
+        for diff in diffs.drain(..).rev() {
             let last = diff[0];
-
             let num = last - prev_inserted;
-            diff.insert(0, num);
             prev_inserted = num;
         }
-        answer += diffs[0].first().unwrap();
+
+        answer += prev_inserted;
     }
 
     answer
