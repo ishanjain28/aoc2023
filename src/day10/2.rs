@@ -53,61 +53,27 @@ enum Direction {
     West,
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
-enum Tile {
-    Vertical = 0x1,
-    Horizontal = 0x2,
-    L = 0x4,
-    J = 0x8,
-    Seven = 0x10,
-    F = 0x20,
-    Ground = 0x40,
-    Start = 0x80,
-
-    // Reusing a bitmap because these will never be togther in a single map
-    X = 0x1 | 0x2,
-}
-
-impl From<char> for Tile {
-    fn from(value: char) -> Self {
-        use Tile::*;
-
-        match value {
-            '|' => Vertical,
-            '-' => Horizontal,
-            'L' => L,
-            'J' => J,
-            '7' => Seven,
-            'F' => F,
-            '.' => Ground,
-            'S' => Start,
-
-            _ => unreachable!(),
-        }
-    }
-}
-
-fn next_direction(a: char, dir: &Direction) -> (Direction, u8) {
+#[inline]
+const fn next_direction(a: char, dir: &Direction) -> (Direction, [char; 3]) {
     use Direction::*;
-    use Tile::*;
     match (a, dir) {
-        ('|', Unknown | North) => (North, Vertical as u8 | Seven as u8 | F as u8),
-        ('|', South) => (South, Vertical as u8 | L as u8 | J as u8),
+        ('|', Unknown | North) => (North, ['|', '7', 'F']),
+        ('|', South) => (South, ['|', 'L', 'J']),
 
-        ('-', Unknown | West) => (West, Horizontal as u8 | L as u8 | F as u8),
-        ('-', East) => (East, Horizontal as u8 | J as u8 | Seven as u8),
+        ('-', Unknown | West) => (West, ['-', 'L', 'F']),
+        ('-', East) => (East, ['-', 'J', '7']),
 
-        ('L', Unknown | West) => (North, Vertical as u8 | Seven as u8 | F as u8),
-        ('L', South) => (East, Horizontal as u8 | J as u8 | Seven as u8),
+        ('L', Unknown | West) => (North, ['|', '7', 'F']),
+        ('L', South) => (East, ['-', 'J', '7']),
 
-        ('J', Unknown | South) => (West, Horizontal as u8 | L as u8 | F as u8),
-        ('J', East) => (North, Vertical as u8 | F as u8 | Seven as u8),
+        ('J', Unknown | South) => (West, ['-', 'L', 'F']),
+        ('J', East) => (North, ['|', 'F', '7']),
 
-        ('7', Unknown | East) => (South, Vertical as u8 | L as u8 | J as u8),
-        ('7', North) => (West, Horizontal as u8 | L as u8 | F as u8),
+        ('7', Unknown | East) => (South, ['|', 'L', 'J']),
+        ('7', North) => (West, ['-', 'L', 'F']),
 
-        ('F', Unknown | North) => (East, Horizontal as u8 | Seven as u8 | J as u8),
-        ('F', West) => (South, Vertical as u8 | L as u8 | J as u8),
+        ('F', Unknown | North) => (East, ['-', '7', 'J']),
+        ('F', West) => (South, ['|', 'L', 'J']),
 
         _ => unreachable!(),
     }
@@ -135,9 +101,9 @@ fn process(data: &str) -> usize {
         }
     }
 
-    let mut map = vec![vec![Tile::Ground; n]; m];
+    let mut map = vec![vec!['.'; n]; m];
 
-    'outer: for c in ['-', '|', 'L', 'J', '7', 'F'] {
+    'outer: for c in ['L', 'F', '-', '|', 'J', '7'] {
         let mut start = true;
         grid[s_x][s_y] = c;
         let mut sx = s_x;
@@ -152,7 +118,7 @@ fn process(data: &str) -> usize {
             }
             start = false;
 
-            local_map[sx][sy] = Tile::from(grid[sx][sy]);
+            local_map[sx][sy] = grid[sx][sy];
             // what we need to figure out the next step
             // 1. The current character
             // 2. Direction we are headed in
@@ -175,8 +141,8 @@ fn process(data: &str) -> usize {
                 continue 'outer;
             }
 
-            let next_pipe = Tile::from(grid[p as usize][q as usize]);
-            if valid_pipes & next_pipe as u8 > 0 {
+            let next_pipe = grid[p as usize][q as usize];
+            if valid_pipes.contains(&next_pipe) {
                 sx = p as usize;
                 sy = q as usize;
                 direction = new_direction;
@@ -188,97 +154,45 @@ fn process(data: &str) -> usize {
         map = local_map;
     }
 
-    let mut nmap = vec![vec![Tile::Ground; n * 2]; m * 2];
+    for line in map.into_iter() {
+        let mut vertical_lines = 0;
 
-    for (i, line) in map.iter().enumerate() {
-        for (j, c) in line.iter().enumerate() {
-            nmap[i * 2][j * 2] = *c;
-        }
-    }
+        let mut found_l = false;
+        let mut found_f = false;
+        for c in line {
+            let count = match c {
+                '|' => 1,
+                'L' => {
+                    found_l = true;
+                    0
+                }
+                '7' if found_l => 1,
+                'F' => {
+                    found_f = true;
+                    0
+                }
+                'J' if found_f => 1,
+                '-' => 0,
+                _ => {
+                    found_l = false;
+                    found_f = false;
+                    0
+                }
+            };
 
-    use Tile::*;
-    for line in nmap.iter_mut() {
-        for j in 0..2 * n - 2 {
-            if (line[j] as u8 & (F as u8 | L as u8 | Horizontal as u8)) > 0
-                && (line[j + 2] as u8 & (J as u8 | Seven as u8 | Horizontal as u8)) > 0
-            {
-                line[j + 1] = Horizontal;
-            }
-        }
-    }
-
-    for j in 0..n * 2 {
-        for i in 0..m * 2 - 2 {
-            if (nmap[i][j] as u8 & (F as u8 | Seven as u8 | Vertical as u8)) > 0
-                && (nmap[i + 2][j] as u8 & (L as u8 | J as u8 | Vertical as u8)) > 0
-            {
-                nmap[i + 1][j] = Vertical;
-            }
-        }
-    }
-
-    for j in 0..2 * n {
-        if nmap[0][j] == Ground {
-            flood_fill(&mut nmap, 0, j, X);
-        }
-    }
-
-    let mut out = vec![vec![Tile::Ground; n]; m];
-
-    for (i, line) in nmap.iter().enumerate() {
-        if i % 2 != 0 {
-            continue;
-        }
-
-        for (j, c) in line.iter().enumerate() {
-            if j % 2 != 0 {
-                continue;
+            vertical_lines += count;
+            if count > 0 {
+                found_l = false;
+                found_f = false;
             }
 
-            out[i / 2][j / 2] = *c;
-        }
-    }
-
-    for line in out.into_iter() {
-        for c in line.into_iter() {
-            if c == Tile::Ground {
+            if c == '.' && vertical_lines % 2 == 1 {
                 answer += 1;
             }
         }
     }
 
     answer
-}
-
-fn flood_fill(map: &mut Vec<Vec<Tile>>, i: usize, j: usize, fill_with: Tile) {
-    let m = map.len();
-    let n = map[0].len();
-    const DIRS: [[i32; 2]; 4] = [[0, 1], [0, -1], [-1, 0], [1, 0]];
-
-    let mut stack = vec![];
-    stack.push((i, j));
-
-    while let Some((sx, sy)) = stack.pop() {
-        if map[sx][sy] != Tile::Ground {
-            continue;
-        }
-
-        map[sx][sy] = fill_with;
-
-        for dir in DIRS.iter() {
-            let x = sx as i32 + dir[0];
-            let y = sy as i32 + dir[1];
-
-            if x < 0 || y < 0 || x >= m as i32 || y >= n as i32 {
-                continue;
-            }
-
-            let x = x as usize;
-            let y = y as usize;
-
-            stack.push((x, y));
-        }
-    }
 }
 
 fn main() {

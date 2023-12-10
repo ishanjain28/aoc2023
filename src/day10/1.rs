@@ -26,63 +26,29 @@ enum Direction {
     West,
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
-enum Tile {
-    Vertical = 0x1,
-    Horizontal = 0x2,
-    L = 0x4,
-    J = 0x8,
-    Seven = 0x10,
-    F = 0x20,
-    Ground = 0x40,
-    Start = 0x80,
-}
-
-impl From<char> for Tile {
-    fn from(value: char) -> Self {
-        use Tile::*;
-
-        match value {
-            '|' => Vertical,
-            '-' => Horizontal,
-            'L' => L,
-            'J' => J,
-            '7' => Seven,
-            'F' => F,
-            '.' => Ground,
-            'S' => Start,
-
-            _ => unreachable!(),
-        }
-    }
-}
-
-fn next_direction(a: char, dir: &Direction) -> (Direction, u8) {
+#[inline]
+const fn next_direction(a: char, dir: &Direction) -> (Direction, [char; 3]) {
     use Direction::*;
-    use Tile::*;
     match (a, dir) {
-        ('|', Unknown | North) => (North, Vertical as u8 | Seven as u8 | F as u8),
-        ('|', South) => (South, Vertical as u8 | L as u8 | J as u8),
+        ('|', Unknown | North) => (North, ['|', '7', 'F']),
+        ('|', South) => (South, ['|', 'L', 'J']),
 
-        ('-', Unknown | West) => (West, Horizontal as u8 | L as u8 | F as u8),
-        ('-', East) => (East, Horizontal as u8 | J as u8 | Seven as u8),
+        ('-', Unknown | West) => (West, ['-', 'L', 'F']),
+        ('-', East) => (East, ['-', 'J', '7']),
 
-        ('L', Unknown | West) => (North, Vertical as u8 | Seven as u8 | F as u8),
-        ('L', South) => (East, Horizontal as u8 | J as u8 | Seven as u8),
+        ('L', Unknown | West) => (North, ['|', '7', 'F']),
+        ('L', South) => (East, ['-', 'J', '7']),
 
-        ('J', Unknown | South) => (West, Horizontal as u8 | L as u8 | F as u8),
-        ('J', East) => (North, Vertical as u8 | F as u8 | Seven as u8),
+        ('J', Unknown | South) => (West, ['-', 'L', 'F']),
+        ('J', East) => (North, ['|', 'F', '7']),
 
-        ('7', Unknown | East) => (South, Vertical as u8 | L as u8 | J as u8),
-        ('7', North) => (West, Horizontal as u8 | L as u8 | F as u8),
+        ('7', Unknown | East) => (South, ['|', 'L', 'J']),
+        ('7', North) => (West, ['-', 'L', 'F']),
 
-        ('F', Unknown | North) => (East, Horizontal as u8 | Seven as u8 | J as u8),
-        ('F', West) => (South, Vertical as u8 | L as u8 | J as u8),
+        ('F', Unknown | North) => (East, ['-', '7', 'J']),
+        ('F', West) => (South, ['|', 'L', 'J']),
 
-        v => {
-            println!("{:?}", v);
-            unreachable!()
-        }
+        _ => unreachable!(),
     }
 }
 
@@ -150,8 +116,8 @@ fn process(data: &str) -> usize {
                 continue 'outer;
             }
 
-            let next_pipe = Tile::from(grid[p as usize][q as usize]);
-            if valid_pipes & next_pipe as u8 > 0 {
+            let next_pipe = grid[p as usize][q as usize];
+            if valid_pipes.contains(&next_pipe) {
                 sx = p as usize;
                 sy = q as usize;
                 direction = new_direction;
