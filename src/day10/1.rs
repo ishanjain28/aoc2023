@@ -1,15 +1,95 @@
 #![feature(test)]
 
-use std::collections::VecDeque;
-
 extern crate test;
 
-const INPUTS: [&str; 2] = [include_str!("./sample.txt"), include_str!("./input.txt")];
+const INPUTS: [&str; 4] = [
+    ".....
+.S-7.
+.|.|.
+.L-J.
+.....",
+    "..F7.
+.FJ|.
+SJ.L7
+|F--J
+LJ...",
+    include_str!("./sample.txt"),
+    include_str!("./input.txt"),
+];
+
+#[derive(Debug)]
+enum Direction {
+    Unknown,
+    North,
+    South,
+    East,
+    West,
+}
+
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+enum Tile {
+    Vertical = 0x1,
+    Horizontal = 0x2,
+    L = 0x4,
+    J = 0x8,
+    Seven = 0x10,
+    F = 0x20,
+    Ground = 0x40,
+    Start = 0x80,
+}
+
+impl From<char> for Tile {
+    fn from(value: char) -> Self {
+        use Tile::*;
+
+        match value {
+            '|' => Vertical,
+            '-' => Horizontal,
+            'L' => L,
+            'J' => J,
+            '7' => Seven,
+            'F' => F,
+            '.' => Ground,
+            'S' => Start,
+
+            _ => unreachable!(),
+        }
+    }
+}
+
+fn next_direction(a: char, dir: &Direction) -> (Direction, u8) {
+    use Direction::*;
+    use Tile::*;
+    match (a, dir) {
+        ('|', Unknown | North) => (North, Vertical as u8 | Seven as u8 | F as u8),
+        ('|', South) => (South, Vertical as u8 | L as u8 | J as u8),
+
+        ('-', Unknown | West) => (West, Horizontal as u8 | L as u8 | F as u8),
+        ('-', East) => (East, Horizontal as u8 | J as u8 | Seven as u8),
+
+        ('L', Unknown | West) => (North, Vertical as u8 | Seven as u8 | F as u8),
+        ('L', South) => (East, Horizontal as u8 | J as u8 | Seven as u8),
+
+        ('J', Unknown | South) => (West, Horizontal as u8 | L as u8 | F as u8),
+        ('J', East) => (North, Vertical as u8 | F as u8 | Seven as u8),
+
+        ('7', Unknown | East) => (South, Vertical as u8 | L as u8 | J as u8),
+        ('7', North) => (West, Horizontal as u8 | L as u8 | F as u8),
+
+        ('F', Unknown | North) => (East, Horizontal as u8 | Seven as u8 | J as u8),
+        ('F', West) => (South, Vertical as u8 | L as u8 | J as u8),
+
+        v => {
+            println!("{:?}", v);
+            unreachable!()
+        }
+    }
+}
 
 fn process(data: &str) -> usize {
     let mut answer = std::usize::MAX;
 
-    let grid: Vec<Vec<char>> = data
+    let mut grid: Vec<Vec<char>> = data
         .lines()
         .filter(|x| !x.is_empty())
         .map(|x| x.chars().collect())
@@ -28,334 +108,63 @@ fn process(data: &str) -> usize {
             }
         }
     }
+    'outer: for c in ['-', '|', 'L', 'J', '7', 'F'] {
+        let mut start = true;
 
-    for mut c in ['F', 'L', '|', '-', 'J', '7'] {
         let mut sx = s_x;
         let mut sy = s_y;
-        let (mut px, mut py) = (s_x, s_y);
         let mut length = 0;
+        grid[sx][sy] = c;
 
-        while c != 'S' {
-            println!(
-                "({}, {}) => ({}, {}) c = {} {}",
-                px, py, sx, sy, c, grid[sx][sy]
-            );
+        let mut direction = Direction::Unknown;
 
-            match c {
-                '|' => {
-                    if sx > 0 && !(sx - 1 == px && sy == py) {
-                        px = sx;
-                        py = sy;
-                        sx = sx - 1;
-                        length += 1;
-                        c = grid[sx][sy];
-                    } else if sx < m - 1 && !(sx + 1 == px && sy == py) {
-                        px = sx;
-                        py = sy;
-                        sx = sx + 1;
-                        length += 1;
-                        c = grid[sx][sy];
-                    }
-                }
-                'F' => {
-                    if sy < n - 1 && !(sx == px && sy + 1 == py) {
-                        px = sx;
-                        py = sy;
-                        sy = sy + 1;
-                        length += 1;
-                        c = grid[sx][sy];
-                    } else if sx < m - 1 && !(sx + 1 == px && px == py) {
-                        px = sx;
-                        py = sy;
-                        sx = sx + 1;
-                        length += 1;
-                        c = grid[sx][sy];
-                    }
-                }
+        loop {
+            if !start && (sx == s_x && sy == s_y) {
+                break;
+            }
+            start = false;
 
-                '-' => {
-                    if sy > 0 && !(sx == px && sy - 1 == py) {
-                        px = sx;
-                        py = sy;
-                        sy = sy - 1;
-                        length += 1;
-                        c = grid[sx][sy];
-                    } else if sy < n - 1 && !(sx == px && sy + 1 == py) {
-                        px = sx;
-                        py = sy;
-                        sy = sy + 1;
-                        length += 1;
-                        c = grid[sx][sy];
-                    }
-                }
+            if length >= answer {
+                continue 'outer;
+            }
 
-                '7' => {
-                    if sy > 0 && !(sx == px && sy - 1 == py) {
-                        px = sx;
-                        py = sy;
-                        sy = sy - 1;
-                        length += 1;
-                        c = grid[sx][sy];
-                    } else if sx < m - 1 && !(sx + 1 == px && sy == py) {
-                        px = sx;
-                        py = sy;
-                        sx = sx + 1;
-                        length += 1;
-                        c = grid[sx][sy];
-                    }
-                }
+            // what we need to figure out the next step
+            // 1. The current character
+            // 2. Direction we are headed in
+            // 3. the potential next character. since it's possible we jump to an un jumpable
+            //    character
 
-                'J' => {
-                    if sy > 0 && !(sx == px && sy - 1 == py) {
-                        px = sx;
-                        py = sy;
-                        sy = sy - 1;
-                        length += 1;
-                        c = grid[sx][sy];
-                    } else if sx > 0 && !(sx - 1 == px && sy == py) {
-                        px = sx;
-                        py = sy;
-                        sx = sx - 1;
-                        length += 1;
-                        c = grid[sx][sy];
-                    }
-                }
+            let (new_direction, valid_pipes) = next_direction(grid[sx][sy], &direction);
 
-                'L' => {
-                    if sx > 0 && !(sx - 1 == px && sy == py) {
-                        px = sx;
-                        py = sy;
-                        sx = sx - 1;
-                        length += 1;
-                        c = grid[sx][sy];
-                    } else if sy < n - 1 && !(sx == px && sy + 1 == py) {
-                        px = sx;
-                        py = sy;
-                        sy = sy + 1;
-                        length += 1;
-                        c = grid[sx][sy];
-                    }
-                }
-                '.' => break,
+            let (x, y) = match new_direction {
+                Direction::Unknown => unreachable!(),
+                Direction::North => (-1, 0),
+                Direction::South => (1, 0),
+                Direction::East => (0, 1),
+                Direction::West => (0, -1),
+            };
 
-                _ => unreachable!(),
+            let p = sx as i32 + x;
+            let q = sy as i32 + y;
+            if p < 0 || q < 0 || p >= m as i32 || q >= n as i32 {
+                continue 'outer;
+            }
+
+            let next_pipe = Tile::from(grid[p as usize][q as usize]);
+            if valid_pipes & next_pipe as u8 > 0 {
+                sx = p as usize;
+                sy = q as usize;
+                direction = new_direction;
+                length += 1;
+            } else {
+                continue 'outer;
             }
         }
 
         answer = std::cmp::min(answer, length / 2);
     }
 
-    return answer;
-
-    //  let mut stack = vec![];
-    //  //    let mut q = VecDeque::new();
-    //  stack.push((sx, sy, 'F', sx, sy, 0));
-    //  stack.push((sx, sy, 'L', sx, sy, 0));
-
-    let mut min_dist = vec![vec![std::usize::MAX; n]; m];
-
-    //    while let Some((sx, sy, c, px, py, distance)) = stack.pop() {
-    //        min_dist[sx][sy] = std::cmp::min(min_dist[sx][sy], distance);
-    //        match c {
-    //            '|' => {
-    //                if sx > 0 && !(sx - 1 == px && sy == py) {
-    //                    let c = grid[sx - 1][sy];
-    //                    stack.push((sx - 1, sy, c, sx, sy, distance + 1));
-    //                }
-    //                if sx < m - 1 && !(sx + 1 == px && sy == py) {
-    //                    let c = grid[sx + 1][sy];
-    //                    stack.push((sx + 1, sy, c, sx, sy, distance + 1));
-    //                }
-    //            }
-    //
-    //            '-' => {
-    //                if sy > 0 && !(sx == px && sy - 1 == py) {
-    //                    let c = grid[sx][sy - 1];
-    //                    stack.push((sx, sy - 1, c, sx, sy, distance + 1));
-    //                }
-    //                if sy < n - 1 && !(sx == px && sy + 1 == py) {
-    //                    let c = grid[sx][sy + 1];
-    //                    stack.push((sx, sy + 1, c, sx, sy, distance + 1));
-    //                }
-    //            }
-    //
-    //            'L' => {
-    //                if sx > 0 && !(sx - 1 == px && sy == py) {
-    //                    let c = grid[sx - 1][sy];
-    //                    stack.push((sx - 1, sy, c, sx, sy, distance + 1));
-    //                }
-    //                if sy < n - 1 && !(sx == px && sy + 1 == py) {
-    //                    let c = grid[sx][sy + 1];
-    //                    stack.push((sx, sy + 1, c, sx, sy, distance + 1));
-    //                }
-    //            }
-    //
-    //            'J' => {
-    //                if sy > 0 && !(sx == px && sy - 1 == py) {
-    //                    let c = grid[sx][sy - 1];
-    //                    stack.push((sx, sy - 1, c, sx, sy, distance + 1));
-    //                }
-    //                if sx > 0 && !(sx - 1 == px && sy == py) {
-    //                    let c = grid[sx - 1][sy];
-    //                    stack.push((sx - 1, sy, c, sx, sy, distance + 1));
-    //                }
-    //            }
-    //
-    //            '7' => {
-    //                if sy > 0 && !(sx == px && sy - 1 == py) {
-    //                    let c = grid[sx][sy - 1];
-    //                    stack.push((sx, sy - 1, c, sx, sy, distance + 1));
-    //                }
-    //                if sx < m - 1 && !(sx + 1 == px && sy == py) {
-    //                    let c = grid[sx + 1][sy];
-    //                    stack.push((sx + 1, sy, c, sx, sy, distance + 1));
-    //                }
-    //            }
-    //
-    //            'F' => {
-    //                if sy < n - 1 && !(sx == px && sy + 1 == py) {
-    //                    let c = grid[sx][sy + 1];
-    //                    stack.push((sx, sy + 1, c, sx, sy, distance + 1));
-    //                }
-    //                if sx < m - 1 && !(sx + 1 == px && px == py) {
-    //                    let c = grid[sx + 1][sy];
-    //                    stack.push((sx + 1, sy, c, sx, sy, distance + 1));
-    //                }
-    //            }
-    //
-    //            '.' => (),
-    //
-    //            'S' => (),
-    //
-    //            v => {
-    //                unreachable!()
-    //            }
-    //        }
-    //    }
-    //
-    println!();
-
-    for line in min_dist {
-        println!("{:?}", line);
-
-        for c in line {
-            if c == std::usize::MAX {
-                continue;
-            }
-
-            answer = std::cmp::max(answer, c);
-        }
-    }
-    println!();
-
-    //    for &(sx, sy, c) in [(sx, sy, 'F')].iter() {
-    //        let mut visited = vec![vec![false; n]; m];
-    //
-    //        // dfs(&grid, &mut visited, &mut path, sx, sy, c, 0);
-    //    }
-
     answer
-}
-
-fn dfs(
-    grid: &Vec<Vec<char>>,
-    visited: &mut Vec<Vec<bool>>,
-    path: &mut Vec<char>,
-    sx: usize,
-    sy: usize,
-    c: char,
-    distance: usize,
-) {
-    if visited[sx][sy] {
-        //    return;
-    } else {
-        visited[sx][sy] = true;
-    }
-
-    if c == 'S' {
-        return;
-    }
-
-    path.push(c);
-
-    println!("({},{}) = {} {}", sx, sy, c, distance);
-
-    let m = grid.len();
-    let n = grid[0].len();
-
-    match c {
-        '|' => {
-            if sx > 0 {
-                let c = grid[sx - 1][sy];
-                dfs(grid, visited, path, sx - 1, sy, c, distance + 1);
-            }
-            if sx < m - 1 {
-                let c = grid[sx + 1][sy];
-                dfs(grid, visited, path, sx + 1, sy, c, distance + 1);
-            }
-        }
-
-        '-' => {
-            if sy > 0 {
-                let c = grid[sx][sy - 1];
-                dfs(grid, visited, path, sx, sy - 1, c, distance + 1);
-            }
-            if sy < n - 1 {
-                let c = grid[sx][sy + 1];
-                dfs(grid, visited, path, sx, sy + 1, c, distance + 1);
-            }
-        }
-
-        'L' => {
-            if sx > 0 {
-                let c = grid[sx - 1][sy];
-                dfs(grid, visited, path, sx - 1, sy, c, distance + 1);
-            }
-            if sy < n - 1 {
-                let c = grid[sx][sy + 1];
-                dfs(grid, visited, path, sx, sy + 1, c, distance + 1);
-            }
-        }
-
-        'J' => {
-            if sy > 0 {
-                let c = grid[sx][sy - 1];
-                dfs(grid, visited, path, sx, sy - 1, c, distance + 1);
-            }
-            if sx > 0 {
-                let c = grid[sx - 1][sy];
-                dfs(grid, visited, path, sx - 1, sy, c, distance + 1);
-            }
-        }
-
-        '7' => {
-            if sy > 0 {
-                let c = grid[sx][sy - 1];
-                dfs(grid, visited, path, sx, sy - 1, c, distance + 1);
-            }
-            if sx < m - 1 {
-                let c = grid[sx + 1][sy];
-                dfs(grid, visited, path, sx + 1, sy, c, distance + 1);
-            }
-        }
-
-        'F' => {
-            if sy < n - 1 {
-                let c = grid[sx][sy + 1];
-                dfs(grid, visited, path, sx, sy + 1, c, distance + 1);
-            }
-            if sx < m - 1 {
-                let c = grid[sx + 1][sy];
-                dfs(grid, visited, path, sx + 1, sy, c, distance + 1);
-            }
-        }
-
-        '.' => (),
-
-        _ => unreachable!(),
-    }
-
-    path.pop();
 }
 
 fn main() {
@@ -367,7 +176,7 @@ fn main() {
 #[bench]
 fn part1(b: &mut test::Bencher) {
     b.iter(|| {
-        let v = process(INPUTS[1]);
+        let v = process(INPUTS[INPUTS.len() - 1]);
         test::black_box(v);
     });
 }
