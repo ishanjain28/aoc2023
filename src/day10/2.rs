@@ -117,8 +117,6 @@ fn process(data: &str) -> usize {
                 break;
             }
             start = false;
-
-            local_map[sx][sy] = grid[sx][sy];
             // what we need to figure out the next step
             // 1. The current character
             // 2. Direction we are headed in
@@ -143,6 +141,7 @@ fn process(data: &str) -> usize {
 
             let next_pipe = grid[p as usize][q as usize];
             if valid_pipes.contains(&next_pipe) {
+                local_map[sx][sy] = grid[sx][sy];
                 sx = p as usize;
                 sy = q as usize;
                 direction = new_direction;
