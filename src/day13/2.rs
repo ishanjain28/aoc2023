@@ -7,49 +7,29 @@ const INPUTS: [&str; 2] = [include_str!("./sample.txt"), include_str!("./input.t
 
 fn process(data: &str) -> usize {
     let mut answer = 0;
+    let mut horizontal_values: Vec<u32> = Vec::with_capacity(50);
+    let mut vertical_values: Vec<u32> = Vec::with_capacity(50);
 
     for line in data.split("\n\n") {
-        let mut horiz_set = vec![];
-
         for line in line.lines() {
-            let line_mask = line.chars().rev().enumerate().fold(0, |mut a, (i, x)| {
-                if let '#' = x {
-                    a |= 1 << (i)
-                }
-                a
-            });
+            let line_mask = line.bytes().fold(0u32, |a, x| a << 1 | (b'#' == x) as u32);
 
-            horiz_set.push(line_mask);
-        }
+            horizontal_values.push(line_mask);
+            vertical_values.resize(line.len(), 0);
 
-        let mut vert_set = vec![];
-
-        for (i, line) in line.lines().rev().enumerate() {
-            for (j, c) in line.chars().enumerate() {
-                if vert_set.len() <= j {
-                    vert_set.push(0);
-                }
-
-                if c == '#' {
-                    vert_set[j] |= 1 << i;
-                }
+            for (c, v) in line.bytes().zip(vertical_values.iter_mut()) {
+                *v <<= 1;
+                *v |= (c == b'#') as u32;
             }
         }
 
-        let horiz_max = (0..horiz_set.len())
-            .rev()
+        let horiz_max = (0..horizontal_values.len())
             .map(|j| {
-                let (a, b) = horiz_set.split_at(j);
+                let (a, b) = horizontal_values.split_at(j);
                 let mut error_count = 0;
-                for (a, b) in a.iter().rev().zip(b.iter()) {
-                    for x in 0..31 {
-                        let a = a & (1 << x);
-                        let b = b & (1 << x);
 
-                        if a != b {
-                            error_count += 1;
-                        }
-                    }
+                for (a, b) in a.iter().rev().zip(b.iter()) {
+                    error_count += (a ^ b).count_ones();
 
                     if error_count > 1 {
                         return 0;
@@ -65,20 +45,12 @@ fn process(data: &str) -> usize {
             .max()
             .unwrap_or_default();
 
-        let vertical_max = (0..vert_set.len())
-            .rev()
+        let vertical_max = (0..vertical_values.len())
             .map(|i| {
-                let (a, b) = vert_set.split_at(i);
+                let (a, b) = vertical_values.split_at(i);
                 let mut error_count = 0;
                 for (a, b) in a.iter().rev().zip(b.iter()) {
-                    for x in 0..31 {
-                        let a = a & (1 << x);
-                        let b = b & (1 << x);
-
-                        if a != b {
-                            error_count += 1;
-                        }
-                    }
+                    error_count += (a ^ b).count_ones();
 
                     if error_count > 1 {
                         return 0;
@@ -96,24 +68,12 @@ fn process(data: &str) -> usize {
 
         answer += 100 * horiz_max;
         answer += vertical_max;
+
+        horizontal_values.clear();
+        vertical_values.clear();
     }
 
     answer
-}
-
-fn fmt(x: i32, length: usize) -> String {
-    let mut out = String::new();
-
-    for c in (0..length).rev() {
-        let c = x & (1 << c);
-        if c >= 1 {
-            out.push('#');
-        } else {
-            out.push('.');
-        }
-    }
-
-    out
 }
 
 fn main() {
