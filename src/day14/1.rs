@@ -5,16 +5,14 @@ extern crate test;
 const INPUTS: [&str; 2] = [include_str!("./sample.txt"), include_str!("./input.txt")];
 
 fn process(data: &str) -> usize {
+    let size = data.lines().count();
+
+    let mut data: Vec<u8> = data.bytes().collect();
     let mut answer = 0;
 
-    let mut grid: Vec<Vec<u8>> = data.lines().map(|x| x.bytes().collect()).collect();
-
-    let m = grid.len();
-    let n = grid[0].len();
-
-    for i in 0..m {
-        for j in 0..n {
-            let c = grid[i][j];
+    for i in 0..size {
+        for j in 0..size {
+            let c = unsafe { *data.get_unchecked(size * i + j + i) };
 
             if c != b'O' {
                 continue;
@@ -22,21 +20,24 @@ fn process(data: &str) -> usize {
 
             // move the rock north
             let mut start = i;
-            while start > 0 && grid[start - 1][j] == b'.' {
+            while start > 0
+                && unsafe { *data.get_unchecked(size * (start - 1) + j + start - 1) } == b'.'
+            {
                 start -= 1;
             }
 
-            grid[i][j] = b'.';
-            grid[start][j] = b'O';
+            unsafe {
+                *data.get_unchecked_mut(size * i + j + i) = b'.';
+                *data.get_unchecked_mut(size * start + j + start) = b'O';
+            }
         }
     }
 
-    for (i, line) in grid.iter().enumerate() {
-        for &c in line {
-            if c == b'O' {
-                answer += m - i;
-            }
-        }
+    for i in 0..size {
+        let line = unsafe { data.get_unchecked(size * i + i..size * i + i + size) };
+        let count: usize = line.iter().filter(|&&x| x == b'O').count();
+
+        answer += count * (size - i);
     }
 
     answer
