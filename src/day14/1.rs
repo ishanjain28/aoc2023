@@ -7,37 +7,25 @@ const INPUTS: [&str; 2] = [include_str!("./sample.txt"), include_str!("./input.t
 fn process(data: &str) -> usize {
     let size = data.lines().count();
 
-    let mut data: Vec<u8> = data.bytes().collect();
+    let data = data.as_bytes();
     let mut answer = 0;
 
-    for i in 0..size {
-        for j in 0..size {
-            let c = unsafe { *data.get_unchecked(size * i + j + i) };
+    let mut available_space = [0; 100];
 
-            if c != b'O' {
-                continue;
-            }
+    for (i, line) in data.chunks_exact(size + 1).enumerate() {
+        for (c, a) in line.iter().zip(available_space.iter_mut()) {
+            match c {
+                b'#' => *a = 0,
+                b'.' => *a += 1,
 
-            // move the rock north
-            let mut start = i;
-            while start > 0
-                && unsafe { *data.get_unchecked(size * (start - 1) + j + start - 1) } == b'.'
-            {
-                start -= 1;
-            }
-
-            unsafe {
-                *data.get_unchecked_mut(size * i + j + i) = b'.';
-                *data.get_unchecked_mut(size * start + j + start) = b'O';
+                b'O' => {
+                    let final_pos = i - *a;
+                    let score = size - final_pos;
+                    answer += score;
+                }
+                _ => (),
             }
         }
-    }
-
-    for i in 0..size {
-        let line = unsafe { data.get_unchecked(size * i + i..size * i + i + size) };
-        let count: usize = line.iter().filter(|&&x| x == b'O').count();
-
-        answer += count * (size - i);
     }
 
     answer
@@ -45,7 +33,7 @@ fn process(data: &str) -> usize {
 
 fn main() {
     for input in INPUTS.iter() {
-        println!("total = {}", process(input));
+        println!("answer = {}", process(input));
     }
 }
 
