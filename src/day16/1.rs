@@ -31,7 +31,7 @@ fn solve(grid: &[u8], size: i32, (sx, sy, dir): (i32, i32, Direction)) -> usize 
 
     stack.push((sx, sy, dir));
 
-    while let Some((sx, sy, dir)) = stack.pop() {
+    'outer: while let Some((sx, sy, dir)) = stack.pop() {
         if sx < 0 || sy < 0 || sx >= size || sy >= size {
             continue;
         }
@@ -82,16 +82,14 @@ fn solve(grid: &[u8], size: i32, (sx, sy, dir): (i32, i32, Direction)) -> usize 
                     x += r;
                     y += s;
                     if x < 0 || y < 0 || x >= size || y >= size {
-                        break;
+                        continue 'outer;
                     }
                     let c = grid[(x * size + y + x) as usize];
                     if c != b'.' {
                         break;
                     }
                 }
-                if !(x < 0 || y < 0 || x >= size || y >= size) {
-                    stack.push((x, y, dir));
-                }
+                stack.push((x, y, dir));
             }
 
             _ => unreachable!(),

@@ -64,7 +64,7 @@ fn solve(
 
     stack.push((sx, sy, dir));
 
-    while let Some((sx, sy, dir)) = stack.pop() {
+    'outer: while let Some((sx, sy, dir)) = stack.pop() {
         if sx < 0 || sy < 0 || sx >= size || sy >= size {
             continue;
         }
@@ -115,7 +115,7 @@ fn solve(
                     x += r;
                     y += s;
                     if x < 0 || y < 0 || x >= size || y >= size {
-                        break;
+                        continue 'outer;
                     }
 
                     let c = grid[(x * size + y + x) as usize];
@@ -123,9 +123,7 @@ fn solve(
                         break;
                     }
                 }
-                if !(x < 0 || y < 0 || x >= size || y >= size) {
-                    stack.push((x, y, dir));
-                }
+                stack.push((x, y, dir));
             }
 
             _ => unreachable!(),
