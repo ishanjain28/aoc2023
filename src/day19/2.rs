@@ -8,47 +8,37 @@ extern crate test;
 
 const INPUTS: [&str; 2] = [include_str!("./sample.txt"), include_str!("./input.txt")];
 
-#[derive(Debug)]
-struct Rule {
-    jump_to: String,
-    variable: char,
-    condition: char,
+#[derive(Debug, Clone)]
+struct Rule<'a> {
+    jump_to: &'a [u8],
+    variable: u8,
+    condition: u8,
     num: u64,
 }
 
 fn process(data: &str) -> u64 {
-    let mut data = data.split("\n\n");
-
+    let data = data.as_bytes();
     let mut workflows = HashMap::new();
 
-    for workflow in data.next().unwrap().lines() {
-        let (name, remain) = workflow.split_once(|x| x == '{').unwrap();
-        let mut rules = vec![];
-        for branch in remain.split(',') {
-            let rule = if branch.contains(|x| x == '<' || x == '>') {
-                let branch: Vec<char> = branch.chars().collect();
+    for workflow in data.split(|&x| x == b'\n') {
+        if workflow.is_empty() {
+            break;
+        }
+        let (name, remain) = workflow.split_once(|&x| x == b'{').unwrap();
+
+        let mut rules: Vec<Rule> = vec![];
+        for branch in remain.split(|&x| x == b',') {
+            let rule = if branch.contains(&b'<') || branch.contains(&b'>') {
                 let variable = branch[0];
                 let condition = branch[1];
                 let num: String = branch[2..]
                     .iter()
+                    .map(|&x| x as char)
                     .take_while(|&x| x.is_ascii_digit())
                     .collect();
+                let l = num.len();
                 let num: u64 = num.parse::<u64>().unwrap();
-
-                let mut jump_to = String::new();
-                for &c in branch.iter().rev() {
-                    if c == '}' {
-                        continue;
-                    }
-
-                    if c == ':' {
-                        break;
-                    }
-
-                    jump_to.push(c);
-                }
-
-                let jump_to: String = jump_to.chars().rev().collect();
+                let jump_to = &branch[3 + l..branch.len()];
 
                 Rule {
                     jump_to,
@@ -57,28 +47,13 @@ fn process(data: &str) -> u64 {
                     num,
                 }
             } else {
-                let branch: Vec<char> = branch.chars().collect();
-
-                let mut jump_to = String::new();
-                for &c in branch.iter().rev() {
-                    if c == '}' {
-                        continue;
-                    }
-
-                    if c == ':' {
-                        break;
-                    }
-
-                    jump_to.push(c);
-                }
-
-                let jump_to: String = jump_to.chars().rev().collect();
+                let jump_to = &branch[0..branch.len() - 1];
 
                 Rule {
                     jump_to,
-                    condition: ' ',
+                    condition: 0,
                     num: 0,
-                    variable: ' ',
+                    variable: 0,
                 }
             };
             rules.push(rule);
@@ -88,154 +63,78 @@ fn process(data: &str) -> u64 {
     }
 
     let mut answer = 0;
-
     let mut set = Vec::new();
-    set.push(("in".to_string(), 1..=4000, 1..=4000, 1..=4000, 1..=4000));
+    let start = vec![b'i', b'n'];
 
-    while !set.is_empty() {
-        let mut next = Vec::new();
+    set.push((start.as_slice(), 1..4001, 1..4001, 1..4001, 1..4001));
 
-        for set_ip in set.drain(..) {
-            let (ref wname, mut x, mut m, mut a, mut s) = set_ip.clone();
-            let rules = workflows.get(wname.as_str()).unwrap();
+    while let Some((wname, mut x, mut m, mut a, mut s)) = set.pop() {
+        let rules = workflows.get(wname.as_ref()).unwrap();
 
-            for rule in rules {
-                match (rule.variable, rule.condition) {
-                    ('x', '>') if x.contains(&rule.num) => {
-                        let new_x = rule.num + 1..=*x.end();
+        for rule in rules {
+            let (x, m, a, s) = match (rule.variable, rule.condition) {
+                (b'x', b'>') if x.contains(&rule.num) => {
+                    let new_x = rule.num + 1..x.end;
+                    x = x.start..rule.num + 1;
 
-                        let remain_x = *x.start()..=rule.num;
-                        x = remain_x;
-
-                        if !new_x.is_empty() {
-                            next.push((
-                                rule.jump_to.clone(),
-                                new_x,
-                                m.clone(),
-                                a.clone(),
-                                s.clone(),
-                            ));
-                        }
-                    }
-                    ('x', '<') if x.contains(&rule.num) => {
-                        let new_x = *x.start()..=rule.num - 1;
-                        x = rule.num..=*x.end();
-                        if !new_x.is_empty() {
-                            next.push((
-                                rule.jump_to.clone(),
-                                new_x,
-                                m.clone(),
-                                a.clone(),
-                                s.clone(),
-                            ));
-                        }
-                    }
-                    ('m', '>') if m.contains(&rule.num) => {
-                        let new_m = rule.num + 1..=*m.end();
-                        m = *m.start()..=rule.num;
-
-                        if !new_m.is_empty() {
-                            next.push((
-                                rule.jump_to.clone(),
-                                x.clone(),
-                                new_m,
-                                a.clone(),
-                                s.clone(),
-                            ));
-                        }
-                    }
-                    ('m', '<') if m.contains(&rule.num) => {
-                        let new_m = *m.start()..=rule.num - 1;
-                        m = rule.num..=*m.end();
-
-                        if !new_m.is_empty() {
-                            next.push((
-                                rule.jump_to.clone(),
-                                x.clone(),
-                                new_m,
-                                a.clone(),
-                                s.clone(),
-                            ));
-                        }
-                    }
-                    ('a', '>') if a.contains(&rule.num) => {
-                        let new_a = rule.num + 1..=*a.end();
-                        a = *a.start()..=rule.num;
-                        if !new_a.is_empty() {
-                            next.push((
-                                rule.jump_to.clone(),
-                                x.clone(),
-                                m.clone(),
-                                new_a,
-                                s.clone(),
-                            ));
-                        }
-                    }
-                    ('a', '<') if a.contains(&rule.num) => {
-                        let new_a = *a.start()..=rule.num - 1;
-                        a = rule.num..=*a.end();
-
-                        if !new_a.is_empty() {
-                            next.push((
-                                rule.jump_to.clone(),
-                                x.clone(),
-                                m.clone(),
-                                new_a,
-                                s.clone(),
-                            ));
-                        }
-                    }
-                    ('s', '<') if s.contains(&rule.num) => {
-                        let new_s = *s.start()..=rule.num - 1;
-                        s = rule.num..=*s.end();
-
-                        if !new_s.is_empty() {
-                            next.push((
-                                rule.jump_to.clone(),
-                                x.clone(),
-                                m.clone(),
-                                a.clone(),
-                                new_s,
-                            ));
-                        }
-                    }
-                    ('s', '>') if s.contains(&rule.num) => {
-                        let new_s = rule.num + 1..=*s.end();
-                        s = *s.start()..=rule.num;
-                        if !new_s.is_empty() {
-                            next.push((
-                                rule.jump_to.clone(),
-                                x.clone(),
-                                m.clone(),
-                                a.clone(),
-                                new_s,
-                            ));
-                        }
-                    }
-                    (' ', ' ') => {
-                        next.push((
-                            rule.jump_to.clone(),
-                            x.clone(),
-                            m.clone(),
-                            a.clone(),
-                            s.clone(),
-                        ));
-                    }
-                    _ => unreachable!(),
+                    (new_x, m.clone(), a.clone(), s.clone())
                 }
+                (b'x', b'<') if x.contains(&rule.num) => {
+                    let new_x = x.start..rule.num;
+                    x = rule.num..x.end;
+
+                    (new_x, m.clone(), a.clone(), s.clone())
+                }
+                (b'm', b'>') if m.contains(&rule.num) => {
+                    let new_m = rule.num + 1..m.end;
+                    m = m.start..rule.num + 1;
+
+                    (x.clone(), new_m, a.clone(), s.clone())
+                }
+                (b'm', b'<') if m.contains(&rule.num) => {
+                    let new_m = m.start..rule.num;
+                    m = rule.num..m.end;
+
+                    (x.clone(), new_m, a.clone(), s.clone())
+                }
+                (b'a', b'>') if a.contains(&rule.num) => {
+                    let new_a = rule.num + 1..a.end;
+                    a = a.start..rule.num + 1;
+
+                    (x.clone(), m.clone(), new_a, s.clone())
+                }
+                (b'a', b'<') if a.contains(&rule.num) => {
+                    let new_a = a.start..rule.num;
+                    a = rule.num..a.end;
+
+                    (x.clone(), m.clone(), new_a, s.clone())
+                }
+                (b's', b'>') if s.contains(&rule.num) => {
+                    let new_s = rule.num + 1..s.end;
+                    s = s.start..rule.num + 1;
+
+                    (x.clone(), m.clone(), a.clone(), new_s)
+                }
+                (b's', b'<') if s.contains(&rule.num) => {
+                    let new_s = s.start..rule.num;
+                    s = rule.num..s.end;
+
+                    (x.clone(), m.clone(), a.clone(), new_s)
+                }
+                (0, 0) => (x.clone(), m.clone(), a.clone(), s.clone()),
+                _ => unreachable!(),
+            };
+
+            if rule.jump_to == [b'R'] {
+                continue;
             }
+            if rule.jump_to == [b'A'] {
+                answer +=
+                    (x.end - x.start) * (m.end - m.start) * (a.end - a.start) * (s.end - s.start);
+                continue;
+            }
+            set.push((&rule.jump_to, x, m, a, s));
         }
-
-        next.retain(|(wname, _, _, _, _)| wname != "R");
-
-        for (_, x, m, a, s) in next.extract_if(|(wname, _, _, _, _)| wname == "A") {
-            answer += (x.end() - x.start() + 1)
-                * (m.end() - m.start() + 1)
-                * (a.end() - a.start() + 1)
-                * (s.end() - s.start() + 1);
-        }
-
-        set = next;
     }
 
     answer
