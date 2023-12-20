@@ -14,13 +14,10 @@ fn compress(mut c: &[u8]) -> usize {
     }
     let mut out = 0;
     let mut i = c.len() as i32 - 1;
-
     let mut pow = 1;
     while i >= 0 {
         out += pow * (c[i as usize] - b'a') as usize;
-
         pow *= 26;
-
         i -= 1;
     }
 
@@ -28,75 +25,66 @@ fn compress(mut c: &[u8]) -> usize {
 }
 
 fn process(data: &str) -> usize {
-    let mut map = HashMap::new();
-    let mut conjunction_inputs = HashMap::new();
+    let data = data.as_bytes();
 
-    for line in data.lines() {
+    let mut map: HashMap<usize, (u8, Vec<usize>)> = HashMap::new();
+    let mut inverted_map: HashMap<usize, Vec<usize>> = HashMap::new();
+
+    for line in data.split(|&x| x == b'\n') {
         if line.is_empty() {
             continue;
         }
-        let (src, remain) = line.split_once(' ').unwrap();
-
-        let src: Vec<char> = src.chars().collect();
+        let (src, remain) = line.split_once(|&x| x == b' ').unwrap();
 
         let (stype, label) = match src[0] {
-            '%' => (src[0], (&src[1..])),
-            '&' => (src[0], &src[1..]),
-            'b' => (' ', src.as_slice()),
+            b'%' => (src[0], compress(&src[1..])),
+            b'&' => (src[0], compress(&src[1..])),
+            b'b' => (0, compress(src)),
 
             _ => unreachable!(),
         };
 
         let remain = &remain[3..];
 
-        let dst: Vec<String> = remain
-            .split(',')
-            .map(|x| x.trim())
-            .map(|x| x.to_string())
+        let dst: Vec<usize> = remain
+            .split(|&x| x == b',')
+            .map(|x| x.trim_ascii())
+            .map(compress)
             .collect();
-
-        let label: String = label.iter().collect();
 
         map.insert(label, (stype, dst));
     }
 
-    for (k, (ntype, dst)) in map.iter() {
-        let ntype = *ntype;
-        if ntype != '&' && ntype != '%' {
-            continue;
-        }
-        for dst in dst {
-            if let Some(&(dtype, _)) = map.get(&dst.to_string()) {
-                if dtype == '&' {
-                    conjunction_inputs
-                        .entry(dst.to_string())
-                        .or_insert_with(Vec::new)
-                        .push(k.to_string());
-                }
-            }
+    for (k, (_, dst)) in map.iter() {
+        for &dst in dst {
+            inverted_map.entry(dst).or_default().push(*k);
         }
     }
 
-    let mut button_state: HashMap<String, bool> = HashMap::new();
-
-    for k in map.keys() {
-        button_state.insert(k.clone(), false);
-    }
+    let mut button_state = vec![false; map.keys().max().unwrap() + 1];
 
     let mut button_presses = vec![];
     let mut button_press = 0;
+
+    let rx_input = *inverted_map
+        .get(&compress("rx".as_bytes()))
+        .unwrap()
+        .iter()
+        .next()
+        .unwrap();
 
     loop {
         button_press += 1;
         cycle(
             button_press,
             &mut button_state,
-            &mut map,
-            &mut conjunction_inputs,
+            &map,
+            &inverted_map,
             &mut button_presses,
+            rx_input,
         );
 
-        if button_presses.len() == conjunction_inputs.get("zh").map_or(0, |x| x.len()) {
+        if button_presses.len() == inverted_map.get(&rx_input).map_or(0, |x| x.len()) {
             break;
         }
     }
@@ -124,57 +112,49 @@ const fn gcd(a: usize, b: usize) -> usize {
 
 fn cycle(
     button_press: usize,
-    state: &mut HashMap<String, bool>,
-    map: &mut HashMap<String, (char, Vec<String>)>,
-    conjunction_inputs: &mut HashMap<String, Vec<String>>,
+    state: &mut [bool],
+    map: &HashMap<usize, (u8, Vec<usize>)>,
+    inverted_map: &HashMap<usize, Vec<usize>>,
     button_presses: &mut Vec<usize>,
+    rx_input: usize,
 ) {
     let mut q = VecDeque::new();
 
-    let (_, broadcast_dst) = map.get(&"broadcaster".to_string()).unwrap();
-    for dst in broadcast_dst {
+    let (_, broadcast_dst) = map.get(&compress("broadcaster".as_bytes())).unwrap();
+    for &dst in broadcast_dst {
         q.push_back((dst, false));
     }
 
     while let Some((dst, pulse)) = q.pop_front() {
-        let (dtype, dnext) = match map.get(dst) {
+        if pulse && dst == rx_input {
+            button_presses.push(button_press);
+            continue;
+        }
+        let (dtype, dnext) = match map.get(&dst) {
             Some(v) => v,
             None => continue,
         };
 
-        if pulse && dst == "zh" {
-            button_presses.push(button_press);
-        }
-
         match dtype {
-            '%' => {
+            b'%' => {
                 if pulse {
                     continue;
                 }
 
-                if let Some(state) = state.get_mut(dst) {
-                    *state = !*state;
-
-                    for next in dnext.iter() {
-                        q.push_back((next, *state));
-                    }
-                } else {
-                    unreachable!()
+                state[dst] = !state[dst];
+                for &next in dnext.iter() {
+                    q.push_back((next, state[dst]));
                 }
             }
 
-            '&' => {
-                let new_state = conjunction_inputs
-                    .get(dst)
-                    .unwrap()
-                    .iter()
-                    .all(|x| *state.get(x).unwrap());
+            b'&' => {
+                let new_state = inverted_map.get(&dst).unwrap().iter().all(|&x| state[x]);
 
-                for next in dnext {
+                for &next in dnext {
                     q.push_back((next, !new_state));
                 }
 
-                *state.get_mut(dst).unwrap() = !new_state;
+                state[dst] = !new_state;
             }
             _ => unreachable!(),
         }
@@ -188,7 +168,7 @@ fn main() {
 }
 
 #[bench]
-fn part1(b: &mut test::Bencher) {
+fn part2(b: &mut test::Bencher) {
     b.iter(|| {
         let v = process(INPUTS[INPUTS.len() - 1]);
         test::black_box(v);

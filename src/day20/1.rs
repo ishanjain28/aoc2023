@@ -158,7 +158,7 @@ fn process(data: &str) -> i64 {
 }
 
 fn main() {
-    for input in INPUTS.iter().skip(2) {
+    for input in INPUTS.iter() {
         println!("answer = {}", process(input));
     }
 }
