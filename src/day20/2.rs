@@ -2,7 +2,7 @@
 #![feature(byte_slice_trim_ascii)]
 #![feature(test)]
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 extern crate test;
 
 const INPUTS: [&str; 1] = [include_str!("./input.txt")];
@@ -27,8 +27,8 @@ fn compress(mut c: &[u8]) -> usize {
 fn process(data: &str) -> usize {
     let data = data.as_bytes();
 
-    let mut map: HashMap<usize, (u8, Vec<usize>)> = HashMap::new();
-    let mut inverted_map: HashMap<usize, Vec<usize>> = HashMap::new();
+    let mut map = vec![];
+    let mut inverted_map = vec![];
 
     for line in data.split(|&x| x == b'\n') {
         if line.is_empty() {
@@ -52,23 +52,27 @@ fn process(data: &str) -> usize {
             .map(compress)
             .collect();
 
-        map.insert(label, (stype, dst));
+        if map.len() <= label {
+            map.extend(std::iter::repeat((0, vec![])).take(label - map.len() + 1));
+        }
+
+        map[label] = (stype, dst);
     }
 
-    for (k, (_, dst)) in map.iter() {
+    inverted_map.extend(std::iter::repeat(vec![]).take(map.len() - inverted_map.len()));
+
+    for (k, (_, dst)) in map.iter().enumerate() {
         for &dst in dst {
-            inverted_map.entry(dst).or_default().push(*k);
+            inverted_map[dst].push(k);
         }
     }
 
-    let mut button_state = vec![false; map.keys().max().unwrap() + 1];
+    let mut button_state = vec![false; map.len() + 1];
 
     let mut button_presses = vec![];
     let mut button_press = 0;
 
-    let rx_input = *inverted_map
-        .get(&compress("rx".as_bytes()))
-        .unwrap()
+    let rx_input = *inverted_map[compress("rx".as_bytes())]
         .iter()
         .next()
         .unwrap();
@@ -84,7 +88,7 @@ fn process(data: &str) -> usize {
             rx_input,
         );
 
-        if button_presses.len() == inverted_map.get(&rx_input).map_or(0, |x| x.len()) {
+        if button_presses.len() == inverted_map[rx_input].len() {
             break;
         }
     }
@@ -113,14 +117,14 @@ const fn gcd(a: usize, b: usize) -> usize {
 fn cycle(
     button_press: usize,
     state: &mut [bool],
-    map: &HashMap<usize, (u8, Vec<usize>)>,
-    inverted_map: &HashMap<usize, Vec<usize>>,
+    map: &[(u8, Vec<usize>)],
+    inverted_map: &[Vec<usize>],
     button_presses: &mut Vec<usize>,
     rx_input: usize,
 ) {
     let mut q = VecDeque::new();
 
-    let (_, broadcast_dst) = map.get(&compress("broadcaster".as_bytes())).unwrap();
+    let (_, broadcast_dst) = &map[compress("broadcaster".as_bytes())];
     for &dst in broadcast_dst {
         q.push_back((dst, false));
     }
@@ -130,11 +134,11 @@ fn cycle(
             button_presses.push(button_press);
             continue;
         }
-        let (dtype, dnext) = match map.get(&dst) {
-            Some(v) => v,
-            None => continue,
-        };
 
+        let (dtype, dnext) = &map[dst];
+        if *dtype == 0 {
+            continue;
+        }
         match dtype {
             b'%' => {
                 if pulse {
@@ -148,7 +152,7 @@ fn cycle(
             }
 
             b'&' => {
-                let new_state = inverted_map.get(&dst).unwrap().iter().all(|&x| state[x]);
+                let new_state = inverted_map[dst].iter().all(|&x| state[x]);
 
                 for &next in dnext {
                     q.push_back((next, !new_state));
