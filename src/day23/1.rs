@@ -4,36 +4,56 @@ extern crate test;
 
 const INPUTS: [&str; 2] = [include_str!("./sample.txt"), include_str!("./input.txt")];
 
+#[derive(Debug, Hash, Eq, PartialEq, Copy, Clone)]
+enum Direction {
+    East,
+    West,
+    North,
+    South,
+}
+
+impl Direction {
+    #[inline]
+    const fn coords(&self) -> [([i64; 2], Self); 3] {
+        use Direction::*;
+
+        match self {
+            Direction::East => [([0, 1], East), ([1, 0], South), ([-1, 0], North)],
+            Direction::West => [([0, -1], West), ([1, 0], South), ([-1, 0], North)],
+            Direction::North => [([0, 1], East), ([0, -1], West), ([-1, 0], North)],
+            Direction::South => [([0, 1], East), ([0, -1], West), ([1, 0], South)],
+        }
+    }
+}
+
 fn process(data: &str) -> i64 {
     let mut answer = 0;
-
-    let grid: Vec<Vec<char>> = data.lines().map(|x| x.chars().collect()).collect();
-
-    let m = grid.len();
-    let n = grid[0].len();
+    let size = data.lines().count() as i64;
+    let data = data.as_bytes();
 
     let mut stack = Vec::new();
-    stack.push((0, 0, 1, BitSet::<156>::new()));
+    use Direction::*;
+    stack.push((0, 0, 1, BitSet::<156>::new(), South));
 
-    while let Some((distance, sx, sy, mut visited)) = stack.pop() {
-        if sx == m as i64 - 1 && sy == n as i64 - 2 {
+    while let Some((distance, sx, sy, mut visited, direction)) = stack.pop() {
+        if sx == size - 1 && sy == size - 2 {
             answer = std::cmp::max(answer, distance);
             continue;
         }
-        if visited.get(sx * m as i64 + sy) {
+        if visited.get(sx * size + sy) {
             continue;
         }
-        visited.set(sx * m as i64 + sy);
+        visited.set(sx * size + sy);
 
-        let c = grid[sx as usize][sy as usize];
+        let c = unsafe { *data.get_unchecked((sx * size + sy + sx) as usize) };
         let sticky = match c {
-            '>' => Some([0, 1]),
-            '<' => Some([0, -1]),
-            'v' => Some([1, 0]),
-            '^' => Some([-1, 0]),
+            b'>' => Some([0, 1]),
+            b'<' => Some([0, -1]),
+            b'v' => Some([1, 0]),
+            b'^' => Some([-1, 0]),
             _ => None,
         };
-        const DIRS: [[i64; 2]; 4] = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+
         if let Some(d) = sticky {
             let mut x = sx;
             let mut y = sy;
@@ -44,9 +64,9 @@ fn process(data: &str) -> i64 {
 
                 if p < 0
                     || q < 0
-                    || p >= m as i64
-                    || q >= n as i64
-                    || grid[p as usize][q as usize] != '.'
+                    || p >= size
+                    || q >= size
+                    || unsafe { *data.get_unchecked((p * size + q + p) as usize) } != b'.'
                 {
                     break;
                 }
@@ -56,21 +76,21 @@ fn process(data: &str) -> i64 {
                 dis += 1;
             }
 
-            stack.push((distance + dis, x, y, visited));
+            stack.push((distance + dis, x, y, visited, direction));
         } else {
-            for dir in DIRS.iter() {
+            for (dir, direction) in direction.coords().iter() {
                 let a = dir[0] + sx;
                 let b = dir[1] + sy;
 
-                if a < 0 || b < 0 || a >= m as i64 || b >= n as i64 {
+                if a < 0 || b < 0 || a >= size || b >= size {
                     continue;
                 }
 
-                if unsafe { grid.get_unchecked(a as usize).get_unchecked(b as usize) == &'#' } {
+                if unsafe { *data.get_unchecked((a * size + b + a) as usize) == b'#' } {
                     continue;
                 }
 
-                stack.push((distance + 1, a, b, visited.clone()));
+                stack.push((distance + 1, a, b, visited.clone(), *direction));
             }
         }
     }

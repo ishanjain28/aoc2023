@@ -3,43 +3,50 @@ extern crate test;
 
 const INPUTS: [&str; 2] = [include_str!("./sample.txt"), include_str!("./input.txt")];
 
+#[derive(Debug, Hash, Eq, PartialEq, Copy, Clone)]
+enum Direction {
+    East,
+    West,
+    North,
+    South,
+}
+
 fn process(data: &str) -> i64 {
     let mut answer = 0;
 
-    let grid: Vec<Vec<char>> = data.lines().map(|x| x.chars().collect()).collect();
+    let size = data.lines().count() as i64;
 
-    let m = grid.len() as i64;
-    let n = grid[0].len() as i64;
+    let data = data.as_bytes();
 
+    use Direction::*;
     let mut stack = Vec::new();
+    stack.push((0, 0, 1, BitSet::<156>::new(), South));
 
-    stack.push((0, 0, 1, BitSet::<156>::new()));
-
-    while let Some((distance, sx, sy, mut visited)) = stack.pop() {
-        if sx == m - 1 && sy == n - 2 {
+    while let Some((distance, sx, sy, mut visited, direction)) = stack.pop() {
+        if sx == size - 1 && sy == size - 2 {
             answer = std::cmp::max(answer, distance);
             continue;
         }
 
-        if unsafe { grid.get_unchecked(sx as usize).get_unchecked(sy as usize) == &'#' } {
+        if unsafe { *data.get_unchecked((sx * size + sy + sx) as usize) == b'#' } {
             continue;
         }
-        if visited.get(sx * m + sy) {
+        if visited.get(sx * size + sy) {
             continue;
         }
-        visited.set(sx * m + sy);
+        visited.set(sx * size + sy);
 
-        if sy + 1 < n {
-            stack.push((distance + 1, sx, sy + 1, visited.clone()));
+        if sy + 1 < size && direction != West {
+            stack.push((distance + 1, sx, sy + 1, visited.clone(), East));
         }
-        if sy > 0 {
-            stack.push((distance + 1, sx, sy - 1, visited.clone()));
+        if sy > 0 && direction != East {
+            stack.push((distance + 1, sx, sy - 1, visited.clone(), West));
         }
-        if sx + 1 < n {
-            stack.push((distance + 1, sx + 1, sy, visited.clone()));
+        if sx + 1 < size && direction != North {
+            stack.push((distance + 1, sx + 1, sy, visited.clone(), South));
         }
-        if sx > 0 {
-            stack.push((distance + 1, sx - 1, sy, visited));
+        if sx > 0 && direction != South {
+            stack.push((distance + 1, sx - 1, sy, visited, North));
         }
     }
 
